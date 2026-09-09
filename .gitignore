@@ -1,0 +1,37 @@
+﻿# Python environments
+.venv/
+.venv-*/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Model / Cache directories
+hf_cache/
+.cache/
+/models/
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Generated experiment outputs
+test_prune/
+test_awq_output/
+recovery_output/
+runtime_log/
+wandb/
+logs/
+LLM-Pruner/LLMPruner/prune_log/
+
+# IDE / System
+.vscode/
+.idea/
+*.tmp
+*.log
+.DS_Store

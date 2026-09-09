@@ -1,0 +1,15 @@
+# Minimal, reproducible Bunny Phi-2 + portable AWQ smoke-test environment.
+# Install PyTorch CUDA wheels separately, as documented in ENVIRONMENT_SETUP.md.
+transformers==4.37.2
+tokenizers==0.15.1
+accelerate==0.28.0
+peft==0.10.0
+sentencepiece==0.1.99
+huggingface_hub>=0.19,<1.0
+packaging>=23.0
+numpy>=1.26,<2.0
+Pillow>=9.0
+tqdm>=4.0
+timm==0.9.12
+einops==0.6.1
+einops-exts==0.0.4
