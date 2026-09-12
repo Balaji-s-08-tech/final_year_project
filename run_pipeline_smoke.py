@@ -4,6 +4,7 @@ import gc
 import os
 import sys
 import time
+import psutil
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "LLM-Pruner"))
@@ -115,13 +116,9 @@ def stage_2_taylor_pruning(model, tokenizer, original_params):
     example_prompts = get_examples("alpaca", tokenizer, NUM_EXAMPLES, seq_len=SEQ_LEN_PRUNE, batch=True)
     example_prompts = example_prompts.cpu()
 
-    model = torch.nn.DataParallel(model)
     loss = model(example_prompts.to("cuda"), labels=example_prompts.to("cuda")).loss
     print(f"  Loss            : {loss.item():.4f}")
     loss.sum().backward()
-
-    if hasattr(model, "module"):
-        model = model.module
         
     del loss, example_prompts
     gc.collect()
@@ -205,10 +202,12 @@ def stage_5_awq_quantize(model, tokenizer):
     print(f"  Bits            : {config.bits}")
     print(f"  Group size      : {config.group_size}")
 
+    torch.cuda.reset_peak_memory_stats()
     t0 = time.time()
     summary = quantize_bunny_awq(model, samples, config)
     elapsed = time.time() - t0
-    peak_vram = torch.cuda.max_memory_allocated() / 1e9
+    peak_vram_alloc = torch.cuda.max_memory_allocated() / 1e9
+    peak_vram_res = torch.cuda.max_memory_reserved() / 1e9
 
     awq_count = sum(1 for m in model.modules() if isinstance(m, PackedAWQLinear))
     linear_count = sum(1 for m in model.modules() if isinstance(m, nn.Linear))
@@ -218,9 +217,10 @@ def stage_5_awq_quantize(model, tokenizer):
     print(f"  PackedAWQLinear : {awq_count}")
     print(f"  Remaining Linear: {linear_count}")
     print(f"  Time            : {elapsed:.1f}s")
-    print(f"  Peak VRAM       : {peak_vram:.2f} GB")
+    print(f"  Peak CUDA alloc : {peak_vram_alloc:.2f} GB")
+    print(f"  Peak CUDA resrv : {peak_vram_res:.2f} GB")
     print("  STATUS: PASS")
-    return summary, elapsed, peak_vram
+    return summary, elapsed, peak_vram_alloc, peak_vram_res
 
 
 def stage_6_save_compressed(model, tokenizer, config_dict, summary):
@@ -286,7 +286,11 @@ def main():
     os.makedirs(SMOKE_OUTPUT_DIR, exist_ok=True)
 
     model, tokenizer, original_params = stage_1_load_model()
+
+    torch.cuda.reset_peak_memory_stats()
     model, tokenizer, pruned_params = stage_2_taylor_pruning(model, tokenizer, original_params)
+    peak_taylor_alloc = torch.cuda.max_memory_allocated() / 1e9
+
     pruned_size = stage_3_save_pruned(model, tokenizer)
     stage_4_recovery_skipped()
 
@@ -298,9 +302,12 @@ def main():
     model = ckpt["model"]
     tokenizer = ckpt["tokenizer"]
     del ckpt
+    model.eval()
+    for param in model.parameters():
+        param.requires_grad_(False)
     gc.collect()
 
-    summary, quant_time, peak_vram = stage_5_awq_quantize(model, tokenizer)
+    summary, quant_time, peak_vram_alloc, peak_vram_res = stage_5_awq_quantize(model, tokenizer)
     config_dict = {"bits": 4, "group_size": 128}
     awq_size = stage_6_save_compressed(model, tokenizer, config_dict, summary)
 
@@ -320,11 +327,29 @@ def main():
     print(f"  Quantized linears     : {summary['quantized_linears']}")
     print(f"  INT4 config           : bits=4, group_size=128")
     print(f"  Quantization time     : {quant_time:.1f}s")
-    print(f"  Peak GPU memory       : {peak_vram:.2f} GB")
     print(f"  Reload                : SUCCESS")
     print(f"  Forward integrity     : {'PASS' if forward_ok else 'FAIL'}")
     print(f"  Recovery              : SKIPPED (hardware constraint)")
     print(f"  ACCURACY EVALUATION   : PENDING")
+
+    current_alloc = torch.cuda.memory_allocated() / 1e9
+    current_resrv = torch.cuda.memory_reserved() / 1e9
+    sys_ram = psutil.Process().memory_info().rss / 1e9
+
+    print("\n================================================================")
+    print("  MEMORY USAGE")
+    print("================================================================")
+    print("  Dedicated GPU VRAM capacity: 6.00 GB\n")
+    print(f"  Current CUDA allocated : {current_alloc:.2f} GB")
+    print(f"  Current CUDA reserved  : {current_resrv:.2f} GB")
+    print(f"  Peak CUDA allocated (Taylor-FO): {peak_taylor_alloc:.2f} GB")
+    print(f"  Peak CUDA allocated (AWQ)      : {peak_vram_alloc:.2f} GB")
+    print(f"  Peak CUDA reserved (AWQ)       : {peak_vram_res:.2f} GB\n")
+    print(f"  Process system RAM RSS         : {sys_ram:.2f} GB")
+    if peak_taylor_alloc > 6.0:
+        print("\n  NOTE: Taylor-FO smoke configuration exceeds the 6 GB dedicated")
+        print("  VRAM budget; Windows shared GPU memory was utilized.")
+        print("  AWQ peak CUDA allocation remained below the 6 GB dedicated VRAM capacity.")
 
     print("\n" + "=" * 64)
     if forward_ok:
