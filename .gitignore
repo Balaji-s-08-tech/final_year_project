@@ -1,4 +1,4 @@
-﻿# Python environments
+# Python environments
 .venv/
 .venv-*/
 venv/
@@ -23,6 +23,7 @@ checkpoints/
 # Generated experiment outputs
 test_prune/
 test_awq_output/
+smoke_test_output/
 recovery_output/
 runtime_log/
 wandb/
