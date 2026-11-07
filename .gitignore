@@ -36,3 +36,10 @@ LLM-Pruner/LLMPruner/prune_log/
 *.tmp
 *.log
 .DS_Store
+
+# Frontend dependencies and generated build output
+Interface/node_modules/
+Interface/dist/
+Interface/.env
+Interface/.env.local
+Interface/.env.*.local

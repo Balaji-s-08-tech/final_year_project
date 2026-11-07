@@ -1,0 +1,5 @@
+{
+  "name": "VLM Pruning & AWQ Research Dashboard",
+  "description": "Research platform for Large Vision-Language Model structured pruning and Activation-Aware Weight Quantization (AWQ) on Bunny-v1_0-3B.",
+  "requestFramePermissions": []
+}
