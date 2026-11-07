@@ -74,10 +74,11 @@ python -m VLM.quantization.benchmark `
   --output D:/runs/bunny_benchmark_manifest.json
 ```
 
-The benchmark manifest reports artifact sizes and precision.  Accuracy,
-generation latency, tokens/sec, and peak GPU memory deliberately say `NOT
-IMPLEMENTED / PENDING` until the project’s concrete Bunny evaluation protocol
-is connected and run.  It does not claim that AWQ is better than INT8.
+The benchmark manifest reports artifact sizes and precision. Accuracy,
+generation latency, tokens/sec, and peak GPU memory say `NOT MEASURED` until an
+actual Bunny evaluation protocol records them. It does not claim that AWQ is
+better than INT8. Exports are named `bunny_awq_int4.pt` or `bunny_awq_int8.pt`
+according to the selected bit width.
 
 ## Existing copied AWQ core
 
@@ -104,5 +105,9 @@ Calibration keeps only a capped number of activations for one block and uses
 inference mode.  CUDA can be requested after measuring available memory; no
 claim is made that the full recovery model fits on 6 GB.
 
-Implementation completed; experimental validation with real Bunny checkpoints,
-calibration data, a supported Python environment, and a GPU remains pending.
+The small Phi-like CPU tests pass for the portable INT4 save/reload/forward path
+and the INT8 control. Full Bunny model loading, recovery, full-model AWQ, and
+task evaluation remain pending: the local Hugging Face cache has tokenizer and
+config files but no model weights, and the existing local smoke run skipped
+recovery because of hardware constraints. Existing prune/AWQ smoke artifacts
+must not be described as a recovered-model result.

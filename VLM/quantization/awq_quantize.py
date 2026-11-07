@@ -289,7 +289,7 @@ def _save_output(output_dir: Path, model: nn.Module, tokenizer, config: AWQConfi
     metadata = {"quantization": config.to_dict(), "source": dict(source), "summary": dict(summary), "model_config": model.config.to_dict()}
     metadata_path = output_dir / "awq_config.json"
     metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True, default=str), encoding="utf-8")
-    checkpoint = output_dir / "bunny_awq_int4.pt"
+    checkpoint = output_dir / f"bunny_awq_int{config.bits}.pt"
     torch.save({"format": "bunny-awq-portable-v1", "model": model.cpu(), "tokenizer": tokenizer, "metadata": metadata}, checkpoint)
     return checkpoint
 
