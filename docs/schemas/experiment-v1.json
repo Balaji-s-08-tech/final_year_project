@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VLM experiment identity v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "name",
+    "created_at",
+    "config_sha256",
+    "seed",
+    "source",
+    "model",
+    "dataset",
+    "owner_pid"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "seed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "commit",
+        "branch",
+        "dirty",
+        "files"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "identifier",
+        "architecture",
+        "revision",
+        "config_sha256",
+        "checkpoint",
+        "checkpoint_sha256",
+        "precision",
+        "quantization"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "required": [
+        "identifier",
+        "revision",
+        "fingerprint",
+        "calibration",
+        "evaluation"
+      ]
+    },
+    "owner_pid": {
+      "type": "integer"
+    }
+  }
+}

@@ -10,10 +10,12 @@ does not claim kernel-level INT4 speedups.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import gc
 import json
 import logging
 import random
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
@@ -303,12 +305,26 @@ def _seed_everything(seed: int) -> None:
 
 
 def _save_output(output_dir: Path, model: nn.Module, tokenizer, config: AWQConfig, source: Mapping[str, object], summary: Mapping[str, object]) -> Path:
+    from experiments.provenance import canonical_hash, file_hash
+    from experiments.store import publish, write_json
+    packed_bits = {module.bits for module in model.modules() if isinstance(module, PackedAWQLinear)}
+    if packed_bits != {config.bits}:
+        raise ValueError("Export precision must match the model's packed AWQ layers")
     output_dir.mkdir(parents=True, exist_ok=True)
     metadata = {"quantization": config.to_dict(), "source": dict(source), "summary": dict(summary), "model_config": model.config.to_dict()}
     metadata_path = output_dir / "awq_config.json"
-    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True, default=str), encoding="utf-8")
     checkpoint = output_dir / f"bunny_awq_int{config.bits}.pt"
-    torch.save({"format": "bunny-awq-portable-v1", "model": model.cpu(), "tokenizer": tokenizer, "metadata": metadata}, checkpoint)
+    # Reserve the output namespace before writing any checkpoint. This exclusive,
+    # atomic metadata publication also prevents concurrent INT4/INT8 collisions.
+    write_json(metadata_path, metadata)
+    publish(checkpoint, lambda stream: torch.save({"format": "bunny-awq-portable-v1", "model": model.cpu(), "tokenizer": tokenizer, "metadata": metadata}, stream))
+    digest = file_hash(checkpoint, max_bytes=None)
+    write_json(checkpoint.with_name(checkpoint.name + ".metadata.json"), {
+        "schema_version": 1, "filename": checkpoint.name, "size_bytes": digest["size_bytes"], "sha256": digest["sha256"],
+        "format": "portable_awq", "precision": f"AWQ INT{config.bits}",
+        "model_config_sha256": canonical_hash(metadata["model_config"]),
+        "quantization": {"method": "AWQ", "bits": config.bits, "calibration": config.to_dict()},
+    })
     return checkpoint
 
 
@@ -328,21 +344,48 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="cpu", help="cpu, cuda, cuda:0, or auto. CPU is the safe default for 6 GB GPUs.")
     parser.add_argument("--pruning_ratio", type=float)
+    parser.add_argument("--experiment-dir", help="Existing RUNNING parent experiment; backend use")
     args = parser.parse_args()
     if not args.model_path and not args.recovery_checkpoint and not args.pruned_checkpoint:
         parser.error("Provide --model_path or --pruned_checkpoint/--recovery_checkpoint.")
     config = AWQConfig(bits=args.bits, group_size=args.group_size, calibration_samples=args.calibration_samples, sequence_length=args.sequence_length, max_tokens_per_linear=args.max_tokens_per_linear, seed=args.seed, device=args.device, pruning_ratio=args.pruning_ratio)
     config.validate()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    _seed_everything(config.seed)
-    recovery = args.recovery_checkpoint or args.model_path
-    tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device)
-    texts = load_calibration_text(args.calibration_data)
-    samples = build_calibration_samples(tokenizer, texts, config.calibration_samples, config.sequence_length, config.seed)
-    summary = quantize_bunny_awq(model, samples, config)
-    checkpoint = _save_output(Path(args.output_dir), model, tokenizer, config, source, summary)
-    LOG.info("Saved portable AWQ checkpoint to %s", checkpoint)
+    from experiments.store import ExperimentStore, Run
+    from experiments.schema import benchmark, measurement
+    run = Run(args.experiment_dir) if args.experiment_dir else ExperimentStore(Path(args.output_dir) / "experiments").create(
+        f"awq_int{config.bits}", vars(args), model={"identifier": args.base_model, "checkpoint": args.model_path or args.pruned_checkpoint, "quantization": config.to_dict()},
+        dataset={"identifier": args.calibration_data, "calibration": config.to_dict()}, source_paths=["VLM/quantization/awq_quantize.py"])
+    if not args.experiment_dir:
+        run.transition("RUNNING")
+    elif run.latest()["status"] != "RUNNING":
+        raise ValueError("Parent experiment must be RUNNING")
+    started = time.perf_counter()
+    try:
+        from experiments.output import record_output
+        with record_output(run) if not args.experiment_dir else nullcontext():
+            _seed_everything(config.seed)
+            recovery = args.recovery_checkpoint or args.model_path
+            tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device)
+            texts = load_calibration_text(args.calibration_data)
+            samples = build_calibration_samples(tokenizer, texts, config.calibration_samples, config.sequence_length, config.seed)
+            summary = quantize_bunny_awq(model, samples, config)
+            output = Path(args.output_dir) if args.experiment_dir else run.path / "artifacts"
+            checkpoint = _save_output(output, model, tokenizer, config, source, summary)
+            run.log(f"Saved portable AWQ checkpoint to {checkpoint}")
+            LOG.info("Saved portable AWQ checkpoint to %s", checkpoint)
+            if not args.experiment_dir:
+                run.transition("COMPLETED", metrics=benchmark({"compressed_model_size": measurement("compressed_model_size", checkpoint.stat().st_size, status="MEASURED", method="filesystem_stat"),
+                    "execution_duration": measurement("execution_duration", time.perf_counter() - started, status="MEASURED", method="perf_counter")}, quantization={"method": "AWQ", "bits": config.bits, "calibration": config.to_dict()}), artifacts=[str(checkpoint)])
+    except BaseException as exc:
+        if not args.experiment_dir:
+            import traceback
+            run.log(traceback.format_exc(), "stderr.log")
+            run.transition("CANCELLED" if isinstance(exc, KeyboardInterrupt) else "FAILED", error=f"{type(exc).__name__}: {exc}")
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    # Serialize packed layers under their importable module path, not __main__.
+    from VLM.quantization.awq_quantize import main as module_main
+    module_main()

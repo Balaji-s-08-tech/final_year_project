@@ -17,6 +17,8 @@ from backend.checkpoints import get_checkpoint, list_calibration_files, list_che
 from backend.config import FRONTEND_ORIGIN, OUTPUT_ROOT, PROJECT_ROOT
 from backend.jobs import JobManager
 from backend.schemas import ImportResultsRequest, JobRequest, JobSubmission
+from experiments.store import ExperimentStore, write_json
+from experiments.schema import validate_benchmark
 
 logging.basicConfig(level=os.environ.get("VLM_LOG_LEVEL", "INFO"))
 app = FastAPI(title="VLM Compression Research API", version="1.0.0")
@@ -200,18 +202,32 @@ def import_results(request: ImportResultsRequest):
         for field, value in record.items():
             if isinstance(value, float) and not math.isfinite(value):
                 raise HTTPException(status_code=422, detail=f"{name}.{field} must be finite.")
+        if "benchmark" in record:
+            try:
+                validate_benchmark(record["benchmark"])
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HTTPException(status_code=422, detail="Invalid versioned benchmark schema") from exc
     imported_at = datetime.now(timezone.utc).isoformat()
     payload = {"schema_version": 1, "origin": "imported", "imported_at": imported_at, "source_label": request.source_label, "metadata": metadata, "results": results}
     try:
         serialized = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="Manifest must contain finite JSON values only.") from exc
-    import_id = uuid.uuid4().hex
-    target_dir = IMPORTED_RESULTS_ROOT / import_id
-    target_dir.mkdir(parents=True, exist_ok=False)
+    run = ExperimentStore(IMPORTED_RESULTS_ROOT, PROJECT_ROOT).create("import", {"source_label": request.source_label, "manifest": manifest})
+    import_id = run.latest()["run_id"]
+    target_dir = run.path
+    run.transition("RUNNING")
     target_path = target_dir / "benchmark_manifest.json"
-    target_path.write_text(serialized, encoding="utf-8")
+    write_json(target_path, payload)
+    run.log("Imported external results; supplied measurements/provenance are not independently verified")
+    run.transition("COMPLETED", artifacts=[str(target_path)])
     return {"import_id": import_id, "path": str(target_path), "origin": "imported", "imported_at": imported_at, "measured": _has_numeric_measurement(results)}
+
+
+@app.get("/api/experiments")
+def experiment_history():
+    return [{"path": str(run.path), "experiment": json.loads((run.path / "experiment.json").read_text()), "state": run.latest()}
+            for run in ExperimentStore(OUTPUT_ROOT / "experiments", PROJECT_ROOT).runs()]
 
 
 @app.get("/api/pipeline/capabilities")

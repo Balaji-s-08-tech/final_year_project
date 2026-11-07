@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from backend.config import approved_roots
+from experiments.artifacts import inspect_artifact
 
 
 def resolve_approved_path(value: str) -> Path:
@@ -33,15 +34,21 @@ def list_checkpoints() -> list[dict]:
             if not path.is_file() or path.suffix.lower() not in supported:
                 continue
             lowered = path.name.lower()
-            awq = "awq" in lowered or "int4" in lowered or "int8" in lowered
-            precision = "INT4" if "int4" in lowered or "int4" in str(path.parent).lower() else "INT8" if "int8" in lowered else "FP16 / unknown"
-            fmt = "portable_awq" if awq and path.suffix.lower() in {".pt", ".pth"} else path.suffix.lower().lstrip(".")
+            try:
+                metadata = inspect_artifact(path)
+            except (OSError, ValueError):
+                metadata = {"precision": "UNKNOWN", "format": None}
+            awq = metadata["format"] == "portable_awq"
+            precision = metadata["precision"]
+            fmt = "portable_awq" if awq else path.suffix.lower().lstrip(".")
             records.append({
                 "id": _identifier(path),
                 "name": path.name,
                 "path": str(path),
                 "format": fmt,
                 "precision": precision,
+                "checkpoint_sha256": metadata.get("sha256"),
+                "quantization": metadata.get("quantization"),
                 "size_bytes": path.stat().st_size,
                 "parameters": None,
                 "lineage": "AWQ output" if awq else "Serialized model checkpoint; inspect metadata before interpreting as recovered",
