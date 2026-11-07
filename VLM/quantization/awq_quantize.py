@@ -54,9 +54,23 @@ def _effective_group_size(in_features: int, requested_group_size: int) -> int:
 
 
 def _quant_params(weight: torch.Tensor, bits: int, group_size: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Asymmetric groupwise quantization with a possibly smaller final group."""
+    """Quantize each row/group onto an unsigned grid that includes zero.
+
+    Scales/zero points have shape (out_features, ceil(in_features/group_size)).
+    Retain FP32 scales through packing: FP16 would erase small nonzero groups.
+    Scale resolution is floored at FP32's smallest normal value; smaller
+    magnitudes may round to zero. Half-step ties follow FP32 torch.round.
+    """
     if weight.ndim != 2:
         raise ValueError("Only 2-D Linear weights can be quantized.")
+    if bits not in (4, 8):
+        raise ValueError("Only 4-bit and 8-bit weights are supported.")
+    if group_size == 0 or group_size < -1:
+        raise ValueError("group_size must be positive or -1.")
+    if not weight.is_floating_point() or not weight.numel():
+        raise ValueError("Weights must be a non-empty floating-point tensor.")
+    if not torch.isfinite(weight.float()).all():
+        raise ValueError("Weights must be finite and representable in FP32.")
     out_features, in_features = weight.shape
     group_size = _effective_group_size(in_features, group_size)
     n_groups = (in_features + group_size - 1) // group_size
@@ -67,8 +81,12 @@ def _quant_params(weight: torch.Tensor, bits: int, group_size: int) -> Tuple[tor
     for group in range(n_groups):
         start, end = group * group_size, min((group + 1) * group_size, in_features)
         values = weight[:, start:end].float()
-        minimum, maximum = values.amin(dim=1), values.amax(dim=1)
-        scale = ((maximum - minimum) / max_int).clamp_min(1e-8)
+        minimum = values.amin(dim=1).clamp_max(0)
+        maximum = values.amax(dim=1).clamp_min(0)
+        # Divide before subtracting to avoid overflow for large mixed-sign ranges.
+        scale = (maximum / max_int - minimum / max_int).clamp_min(torch.finfo(torch.float32).tiny)
+        # Zero groups need no resolution; a unit scale reconstructs zero exactly.
+        scale = torch.where(maximum == minimum, torch.ones_like(scale), scale)
         zero = torch.round(-minimum / scale).clamp(0, max_int)
         qweight[:, start:end] = torch.round(values / scale[:, None] + zero[:, None]).clamp(0, max_int).to(torch.uint8)
         scales[:, group], zeros[:, group] = scale, zero.to(torch.uint8)
@@ -119,7 +137,7 @@ class PackedAWQLinear(nn.Module):
             self.register_buffer("packed_weight", qweight)
         else:
             raise ValueError("PackedAWQLinear supports 4- or 8-bit weights.")
-        self.register_buffer("scales", scales.to(torch.float16))
+        self.register_buffer("scales", scales.to(torch.float32))
         self.register_buffer("zero_points", zeros)
         self.register_buffer("bias", None if bias is None else bias.detach().to(torch.float16))
 
