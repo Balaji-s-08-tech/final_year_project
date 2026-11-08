@@ -157,3 +157,5 @@ Mission 9 synchronization: implementation/report commit 92e69f84d74e37acf391cc4e
 - Remaining: independent Mission 12 verification; exact pretrained assets/calibration/lineage and task/scorer decisions; complete supported real-model formats; financial authorization and CUDA/L4 feasibility. NO-GO remains; real results Pending/Not measured.
 
 Mission 11 final acceptance rerun after enforcing the hash budget on configuration/portable-header checks: 350 passed, zero failures/skips, one third-party warning, 34.51 seconds. Source compilation and whitespace checks passed. Base branches rechecked unchanged at 09a57c2 (Mission 9) and ba68888 (consolidated handoff).
+
+Mission 11 synchronization: implementation/report commit cbc0732be9afbf6ec3b6fcd6f15ca5120ab0b387 pushed successfully to origin/fix/mission-11-comparison-loader-integrity. A following documentation-only commit records synchronization; validated source is unchanged. No merges, PRs, force pushes, deletions or baseline branch changes.
