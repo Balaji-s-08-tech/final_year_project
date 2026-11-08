@@ -48,3 +48,12 @@ Legacy non-target training/ShortGPT/InternVL entry points remain outside the sup
 
 ## Stop and resume
 Eight remediation cycles were completed; this is the session limit, not proof of completeness. Current verdict: **NO-GO for GPU/research execution; CPU engineering requires independent review.** Resume by verifying the final Mission 13 branch SHA from the progress ledger, inspecting its diff against b999e49, and independently replaying the negative/positive tests with existing CPU dependencies. Then begin a new bounded legacy-entry-point/input-budget review. Do not reset/rewrite history or launch assets/GPU work. Financial, asset, dataset/scorer and pilot authorization gates remain separate.
+
+## Commit inventory and final synchronization
+| Cycles | Commit | Validation / next action |
+| --- | --- | --- |
+| 1–5 | 6d27323567956be0fdf51d012f9edcf00a848242 | Initial audit repairs, strict trust and cheap/bounded admission; 389 CPU tests. Recheck source contracts independently. |
+| 6 | b9b68986d8b4001200b9c5d7df5cd64881e82d6d | Actual held-out content binding; 392 tests. Real asset/scorer validation remains blocked. |
+| 7–8 | 74c7c0ec71de96f07f684c5bd168ce31e76b502e | History isolation, generation/normalization policy and invalid mapping resilience; final 409 tests. Independent audit and next bounded legacy/input-budget review remain. |
+
+All implementation commits were pushed only to fix/mission-13-recursive-engineering. Mission 11 and Mission 9 local refs remain b999e49 and 09a57c2; local baseline work remains 66c1d25. No origin/main tracking ref exists in this checkout, so no claim is made to have reverified its remote tip; no command targeted main for writing. A following ledger-only commit records synchronization, without changing validated source. No merge/PR/force push/deletion occurred.
