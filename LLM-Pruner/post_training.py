@@ -2,6 +2,7 @@
 Refer to
 https://github.com/tloen/alpaca-lora/blob/main/finetune.py
 '''
+import checkpoint_io
 
 import os
 import sys
@@ -30,7 +31,7 @@ def main(args):
     os.environ["WANDB_PROJECT"] = args.wandb_project
 
     # Load Pruned Model
-    pruned_dict = torch.load(args.prune_model, map_location='cpu')
+    pruned_dict = checkpoint_io.load_tensors(args.prune_model, trusted=False)
     tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
 
     gradient_accumulation_steps = args.batch_size // args.micro_batch_size
@@ -135,7 +136,7 @@ def main(args):
     # Load Train Dataset
     data = load_dataset(args.data_path)
     if args.cache_dataset and os.path.exists('datasets/cache/{}.bin'.format(args.data_path)):
-        preprocess_data = torch.load('datasets/cache/{}.bin'.format(args.data_path))
+        preprocess_data = checkpoint_io.load_tensors('datasets/cache/{}.bin'.format(args.data_path), trusted=False)
         train_data, val_data = preprocess_data['train'], preprocess_data['val']
     else:
         train_val = data["train"].train_test_split(

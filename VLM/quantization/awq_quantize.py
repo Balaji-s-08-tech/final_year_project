@@ -363,6 +363,7 @@ def main() -> None:
     parser.add_argument("--device", default="cpu", help="cpu, cuda, cuda:0, or auto. CPU is the safe default for 6 GB GPUs.")
     parser.add_argument("--pruning_ratio", type=float)
     parser.add_argument("--authorize-gpu-execution", action="store_true")
+    parser.add_argument("--trust-local-checkpoint", action="store_true", help="Acknowledge verified local executable pickle source; never use for untrusted files")
     parser.add_argument("--experiment-dir", help="Existing RUNNING parent experiment; backend use")
     args = parser.parse_args()
     if not args.model_path and not args.recovery_checkpoint and not args.pruned_checkpoint:
@@ -387,7 +388,7 @@ def main() -> None:
         with record_output(run) if not args.experiment_dir else nullcontext():
             _seed_everything(config.seed)
             recovery = args.recovery_checkpoint or args.model_path
-            tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device, authorize_gpu=config.authorize_gpu)
+            tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device, authorize_gpu=config.authorize_gpu, trusted=args.trust_local_checkpoint)
             texts = load_calibration_text(args.calibration_data)
             samples = build_calibration_samples(tokenizer, texts, config.calibration_samples, config.sequence_length, config.seed)
             from experiments.provenance import canonical_hash, file_hash

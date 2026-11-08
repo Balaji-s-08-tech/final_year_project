@@ -1,3 +1,4 @@
+import checkpoint_io
 # coding=utf-8
 # Copyright 2023-present the HuggingFace Inc. team.
 #
@@ -355,9 +356,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
                     f"Please check that the file {WEIGHTS_NAME} is present at {model_id}."
                 )
 
-        adapters_weights = torch.load(
-            filename, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        adapters_weights = checkpoint_io.load_tensors(filename, trusted=False)
         # load the weights into the model
         set_peft_model_state_dict(self, adapters_weights, adapter_name=adapter_name)
         if (

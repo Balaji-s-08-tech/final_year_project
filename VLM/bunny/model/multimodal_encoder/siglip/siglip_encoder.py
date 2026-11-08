@@ -22,7 +22,7 @@ class SiglipVisionTower(nn.Module):
     def load_model(self):
         self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name, local_files_only=True)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower, coverage = SiglipVisionModel.from_pretrained(self.vision_tower_name, local_files_only=True, output_loading_info=True)
+        self.vision_tower, coverage = SiglipVisionModel.from_pretrained(self.vision_tower_name, local_files_only=True, output_loading_info=True, use_safetensors=True)
         if any(coverage.get(key) for key in ('missing_keys','unexpected_keys','mismatched_keys','error_msgs')):
             raise ValueError(f'Checkpoint encoder coverage failed: {coverage}')
         from evaluation.integrity import validate_state
@@ -100,7 +100,7 @@ class SiglipVisionTowerS2(SiglipVisionTower):
     def load_model(self):
         self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name, local_files_only=True)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower, coverage = SiglipVisionModel.from_pretrained(self.vision_tower_name, local_files_only=True, output_loading_info=True)
+        self.vision_tower, coverage = SiglipVisionModel.from_pretrained(self.vision_tower_name, local_files_only=True, output_loading_info=True, use_safetensors=True)
         if any(coverage.get(key) for key in ('missing_keys','unexpected_keys','mismatched_keys','error_msgs')):
             raise ValueError(f'Checkpoint encoder coverage failed: {coverage}')
         from evaluation.integrity import validate_state

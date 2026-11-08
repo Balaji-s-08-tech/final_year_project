@@ -1,6 +1,7 @@
 '''
 # Adapted from https://github.com/baaivision/EVA/tree/master/EVA-CLIP
 '''
+import checkpoint_io
 
 from math import pi
 import torch
@@ -692,7 +693,7 @@ def load_state_dict(checkpoint_path: str, map_location: str = 'cpu', model_key: 
         for key in ["input_resolution", "context_length", "vocab_size"]:
             state_dict.pop(key, None)
     else:
-        checkpoint = torch.load(checkpoint_path, map_location=map_location)
+        checkpoint = checkpoint_io.load_tensors(checkpoint_path, trusted=False)
         for mk in model_key.split('|'):
             if isinstance(checkpoint, dict) and mk in checkpoint:
                 state_dict = checkpoint[mk]

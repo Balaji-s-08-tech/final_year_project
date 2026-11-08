@@ -6,18 +6,10 @@ from experiments.provenance import canonical_hash, file_hash
 from experiments.schema import validate_benchmark
 
 
-def _object(pairs):
-    result={}
-    for key,value in pairs:
-        if key in result: raise ValueError(f'Duplicate key: {key}')
-        result[key]=value
-    return result
-
-
 def document(path):
-    def invalid(value): raise ValueError(f'Nonfinite JSON: {value}')
-    value=json.loads(Path(path).read_text(),object_pairs_hook=_object,parse_constant=invalid)
-    if not isinstance(value,dict): raise ValueError('Expected JSON object')
+    from experiments.store import read_json
+    value=read_json(path)
+    if not isinstance(value,dict):raise ValueError('Expected JSON object')
     return value
 
 
@@ -93,7 +85,7 @@ def assess(path, max_asset_hash_bytes=8*1024*1024):
             elif root.is_file():
                 if max_asset_hash_bytes is not None and root.stat().st_size>max_asset_hash_bytes:raise ValueError('Portable model exceeds hash budget')
                 from VLM.quantization.portable_integrity import header
-                config_digest=header(root)['model_config_sha256']
+                config_digest=header(root,max_hash_bytes=max_asset_hash_bytes)['model_config_sha256']
             else:raise ValueError('Missing model configuration evidence')
             if model.get('config_sha256')!=config_digest:raise ValueError('Model configuration hash contradicts assets')
         except (OSError,ValueError,KeyError,TypeError) as exc:errors.append(f'Unverifiable model configuration: {exc}')

@@ -16,6 +16,8 @@ STATUSES = {"MEASURED", "UNMEASURED", "UNAVAILABLE", "FAILED"}
 
 
 def measurement(name, value=None, *, status="UNMEASURED", method=None, unit=None, metadata=None):
+    from experiments.jsonio import validate
+    validate({"value":value,"metadata":metadata})
     if name not in UNITS:
         raise ValueError(f"Unknown metric: {name}")
     unit = UNITS[name] if unit is None else unit
@@ -62,6 +64,8 @@ def benchmark(metrics=None, *, quantization=None):
 
 
 def validate_benchmark(document):
+    from experiments.jsonio import validate
+    validate(document)
     if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document["schema_version"] != VERSION:
         raise ValueError("Invalid benchmark schema/version")
     if not isinstance(document.get("metrics"), dict) or set(document["metrics"]) != set(UNITS):

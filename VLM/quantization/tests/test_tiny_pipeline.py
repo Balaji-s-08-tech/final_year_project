@@ -89,7 +89,7 @@ def test_tiny_calibration_awq_save_reload_and_forward(tmp_path: Path):
     assert sum(isinstance(module, PackedAWQLinear) for module in model.modules()) == 6
     output_dir = tmp_path / "portable-output"
     checkpoint = _save_output(output_dir, model, tokenizer, AWQConfig(bits=4, group_size=128, calibration_samples=2, sequence_length=8, device="cpu"), {"source_format": "test-fixture"}, result)
-    loaded_tokenizer, loaded_model, metadata = load_quantized_bunny_checkpoint(str(checkpoint), device="cpu")
+    loaded_tokenizer, loaded_model, metadata = load_quantized_bunny_checkpoint(str(checkpoint), device="cpu", trusted=True)
     assert isinstance(loaded_tokenizer, TinyTokenizer)
     assert metadata["summary"]["quantized_linears"] == 6
     with torch.inference_mode():

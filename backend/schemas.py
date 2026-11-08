@@ -13,6 +13,7 @@ class JobRequest(BaseModel):
     device: Literal["cpu", "cuda"] = "cpu"
     prompt: Optional[str] = Field(default=None, max_length=4096)
     image: Optional[str] = None
+    trusted_checkpoint: bool = Field(default=False, strict=True)
     max_new_tokens: int = Field(default=64, ge=1, le=128)
 
     @model_validator(mode="after")

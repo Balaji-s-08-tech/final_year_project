@@ -265,7 +265,7 @@ def test_backend_failure_and_interrupted_owner_history(store, tmp_path, monkeypa
 
 
 def test_cli_awq_failure_is_retained_without_model_download(tmp_path):
-    command = [sys.executable, "-m", "VLM.quantization.awq_quantize", "--model_path", str(tmp_path / "missing.pt"),
+    command = [sys.executable, "-m", "VLM.quantization.awq_quantize", "--trust-local-checkpoint", "--model_path", str(tmp_path / "missing.pt"),
                "--calibration_data", str(tmp_path / "missing.txt"), "--output_dir", str(tmp_path / "output"), "--device", "cpu"]
     result = subprocess.run(command, capture_output=True, timeout=20)
     assert result.returncode != 0
@@ -328,7 +328,7 @@ def test_awq_cli_success_has_unique_outputs_and_complete_record(tmp_path):
     torch.save({"model": TinyPhiModel(), "tokenizer": TinyTokenizer()}, checkpoint)
     calibration = tmp_path / "calibration.txt"
     calibration.write_text("small CPU fixture\n")
-    command = [sys.executable, "-m", "VLM.quantization.awq_quantize", "--model_path", str(checkpoint),
+    command = [sys.executable, "-m", "VLM.quantization.awq_quantize", "--trust-local-checkpoint", "--model_path", str(checkpoint),
                "--calibration_data", str(calibration), "--output_dir", str(tmp_path / "out"),
                "--device", "cpu", "--calibration_samples", "1", "--sequence_length", "4"]
     for _ in range(2):
@@ -346,7 +346,7 @@ def test_awq_cli_success_has_unique_outputs_and_complete_record(tmp_path):
         artifact = next((run.path / "artifacts").glob("*.pt"))
         result = subprocess.run([sys.executable, "-c",
             "import sys, torch; from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint; "
-            "_, model, metadata = load_quantized_bunny_checkpoint(sys.argv[1]); "
+            "_, model, metadata = load_quantized_bunny_checkpoint(sys.argv[1], trusted=True); "
             "assert torch.isfinite(model(input_ids=torch.tensor([[1,2]])).logits).all()",
             str(artifact)], capture_output=True, text=True, timeout=20)
         assert result.returncode == 0, result.stderr

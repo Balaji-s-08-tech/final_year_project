@@ -1,3 +1,4 @@
+import checkpoint_io
 from bunny.model import *
 from bunny.model.language_model.bunny_phi import BunnyDistillationModel
 import os
@@ -12,7 +13,16 @@ from transformers import AutoTokenizer, AutoConfig, BitsAndBytesConfig, logging
 # Preserve caller logging policy.
 # Preserve warning diagnostics.
 
-def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
+def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, trusted_checkpoint=False, **kwargs):
+    if kwargs.get("trust_remote_code") is True:raise ValueError("Dynamic model code is unsupported by the local Bunny loader")
+    kwargs.pop("trust_remote_code",None)
+    from checkpoint_io import require_trusted
+    if not trusted_checkpoint:
+        if any(v for k,v in locals().items() if k in ('pruned_model_path','mm','lora')) or kwargs.get('use_safetensors') is False:
+            require_trusted(trusted_checkpoint)
+        kwargs['use_safetensors']=True
+    elif trusted_checkpoint is not True:
+        require_trusted(trusted_checkpoint)
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
     from runtime_policy import admit_placement
@@ -50,7 +60,7 @@ def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, l
         tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True)
         model = BunnyPhi3ForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=False, **kwargs)
     elif model_type == 'stablelm-2':
-        tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=False)
         model = BunnyStableLMForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=False, **kwargs)
     elif model_type == 'qwen1.5-1.8b':
         tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True)
@@ -63,7 +73,7 @@ def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, l
         model = BunnyLlamaForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=False, **kwargs)
     if pruned_model_path:
         print("loading pruned model")
-        pruned_model = torch.load(pruned_model_path, map_location='cpu')
+        pruned_model = checkpoint_io.load_pickle(pruned_model_path, trusted=trusted_checkpoint)
         model.model.layers = deepcopy(pruned_model['model'].model.layers)
         # For LLM-Pruner, change the number of attn heads
         for layer in model.model.layers:
@@ -77,11 +87,11 @@ def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, l
     model.resize_token_embeddings(len(tokenizer))
     if mm:
         mm_path = os.path.join(mm, "mm_projector.bin")
-        mm_projector_weights = torch.load(mm_path, map_location='cpu')
+        mm_projector_weights = checkpoint_io.load_tensors(mm_path, trusted=trusted_checkpoint)
         mm_projector_weights = {k: v.to(torch.float16) for k, v in mm_projector_weights.items()}
         model.load_state_dict(mm_projector_weights, strict=False)
     if lora:
-        non_lora_trainables = torch.load(os.path.join(lora, "non_lora_trainables.bin"), map_location='cpu')
+        non_lora_trainables = checkpoint_io.load_tensors(os.path.join(lora, "non_lora_trainables.bin"), trusted=trusted_checkpoint)
         non_lora_trainables = {(k[18:] if k.startswith('module.base_model.') else k): v for k, v in
                                non_lora_trainables.items()}
         non_lora_trainables = {(k[11:] if k.startswith('base_model.') else k): v for k, v in
@@ -108,7 +118,16 @@ def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, l
     return tokenizer, model
 
 
-def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
+def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, trusted_checkpoint=False, **kwargs):
+    if kwargs.get("trust_remote_code") is True:raise ValueError("Dynamic model code is unsupported by the local Bunny loader")
+    kwargs.pop("trust_remote_code",None)
+    from checkpoint_io import require_trusted
+    if not trusted_checkpoint:
+        if any(v for k,v in locals().items() if k in ('pruned_model_path','mm','lora')) or kwargs.get('use_safetensors') is False:
+            require_trusted(trusted_checkpoint)
+        kwargs['use_safetensors']=True
+    elif trusted_checkpoint is not True:
+        require_trusted(trusted_checkpoint)
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
     from runtime_policy import admit_placement
@@ -142,16 +161,16 @@ def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=Non
     
     if model_type == 'phi-1.5' or model_type == 'phi-2':
         try:
-            tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=False)
         except Exception:
             from transformers import CodeGenTokenizerFast
-            tokenizer = CodeGenTokenizerFast.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=True)
-        model = BunnyPhiForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=True, trust_remote_code=True, **kwargs)
+            tokenizer = CodeGenTokenizerFast.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=False)
+        model = BunnyPhiForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=True, trust_remote_code=False, **kwargs)
     elif model_type == 'phi-3':
         tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True)
         model = BunnyPhi3ForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=False, **kwargs)
     elif model_type == 'stablelm-2':
-        tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True, trust_remote_code=False)
         model = BunnyStableLMForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=False, **kwargs)
     elif model_type == 'qwen1.5-1.8b':
         tokenizer = AutoTokenizer.from_pretrained(bunny_model_path, use_fast=True)
@@ -164,7 +183,7 @@ def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=Non
         model = BunnyLlamaForCausalLM.from_pretrained(bunny_model_path, low_cpu_mem_usage=False, **kwargs)
     if pruned_model_path:
         print("loading pruned model")
-        pruned_model = torch.load(pruned_model_path, map_location='cpu')
+        pruned_model = checkpoint_io.load_pickle(pruned_model_path, trusted=trusted_checkpoint)
         model.model.layers = pruned_model['model'].model.layers
          # For LLM-Pruner, change the number of attn heads
         for layer in model.model.layers:
@@ -176,11 +195,11 @@ def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=Non
     model.resize_token_embeddings(len(tokenizer))
     if mm:
         mm_path = os.path.join(mm, "mm_projector.bin")
-        mm_projector_weights = torch.load(mm_path, map_location='cpu')
+        mm_projector_weights = checkpoint_io.load_tensors(mm_path, trusted=trusted_checkpoint)
         mm_projector_weights = {k: v.to(torch.float16) for k, v in mm_projector_weights.items()}
         model.load_state_dict(mm_projector_weights, strict=False)
     if lora:
-        non_lora_trainables = torch.load(os.path.join(lora, "non_lora_trainables.bin"), map_location='cpu')
+        non_lora_trainables = checkpoint_io.load_tensors(os.path.join(lora, "non_lora_trainables.bin"), trusted=trusted_checkpoint)
         non_lora_trainables = {(k[18:] if k.startswith('module.base_model.') else k): v for k, v in
                                non_lora_trainables.items()}
         non_lora_trainables = {(k[11:] if k.startswith('base_model.') else k): v for k, v in
@@ -218,7 +237,16 @@ def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=Non
     print(f"Number of parameters in the model: {model.num_parameters()}")
     return tokenizer, model, image_processor, context_len
 
-def load_distillation_model(teacher_model_path, student_model_path, pruned_model_path, mm=None, lora=None, device_map=None, device="cuda",  authorize_gpu=False, **kwargs):
+def load_distillation_model(teacher_model_path, student_model_path, pruned_model_path, mm=None, lora=None, device_map=None, device="cuda",  authorize_gpu=False, trusted_checkpoint=False, **kwargs):
+    if kwargs.get("trust_remote_code") is True:raise ValueError("Dynamic model code is unsupported by the local Bunny loader")
+    kwargs.pop("trust_remote_code",None)
+    from checkpoint_io import require_trusted
+    if not trusted_checkpoint:
+        if any(v for k,v in locals().items() if k in ('pruned_model_path','mm','lora')) or kwargs.get('use_safetensors') is False:
+            require_trusted(trusted_checkpoint)
+        kwargs['use_safetensors']=True
+    elif trusted_checkpoint is not True:
+        require_trusted(trusted_checkpoint)
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
     from runtime_policy import admit_placement
@@ -231,7 +259,7 @@ def load_distillation_model(teacher_model_path, student_model_path, pruned_model
     teacher_model_path = require_local_asset(teacher_model_path)
     student_model_path = require_local_asset(student_model_path)
     # Load teacher model
-    _, teacher_model = load_pruned_bunny_model(teacher_model_path, device=device, authorize_gpu=authorize_gpu)
+    _, teacher_model = load_pruned_bunny_model(teacher_model_path, device=device, authorize_gpu=authorize_gpu, trusted_checkpoint=trusted_checkpoint)
     # Load student model and tokenizer
     if device_map is not None:
         kwargs = {"device_map": device_map, **kwargs}
@@ -239,7 +267,7 @@ def load_distillation_model(teacher_model_path, student_model_path, pruned_model
     model = BunnyDistillationModel.from_pretrained(student_model_path, low_cpu_mem_usage=False, local_files_only=True, **kwargs)
     if pruned_model_path:
         print("loading pruned model")
-        pruned_model = torch.load(pruned_model_path, map_location='cpu')
+        pruned_model = checkpoint_io.load_pickle(pruned_model_path, trusted=trusted_checkpoint)
         model.model.layers = deepcopy(pruned_model['model'].model.layers)
         for layer in model.model.layers:
             layer.self_attn.num_heads = layer.self_attn.q_proj.weight.data.shape[0] // layer.self_attn.head_dim
@@ -251,11 +279,11 @@ def load_distillation_model(teacher_model_path, student_model_path, pruned_model
     model.resize_token_embeddings(len(tokenizer))
     if mm:
         mm_path = os.path.join(mm, "mm_projector.bin")
-        mm_projector_weights = torch.load(mm_path, map_location='cpu')
+        mm_projector_weights = checkpoint_io.load_tensors(mm_path, trusted=trusted_checkpoint)
         mm_projector_weights = {k: v.to(torch.float16) for k, v in mm_projector_weights.items()}
         model.load_state_dict(mm_projector_weights, strict=False)
     if lora:
-        non_lora_trainables = torch.load(os.path.join(lora, "non_lora_trainables.bin"), map_location='cpu')
+        non_lora_trainables = checkpoint_io.load_tensors(os.path.join(lora, "non_lora_trainables.bin"), trusted=trusted_checkpoint)
         non_lora_trainables = {(k[18:] if k.startswith('module.base_model.') else k): v for k, v in
                                non_lora_trainables.items()}
         non_lora_trainables = {(k[11:] if k.startswith('base_model.') else k): v for k, v in
@@ -279,7 +307,16 @@ def load_distillation_model(teacher_model_path, student_model_path, pruned_model
     
     
 def load_pretrained_model(model_path, model_base, model_name, model_type, load_8bit=False, load_4bit=False,
-                          device_map="auto", device="cuda", authorize_gpu=False, **kwargs):
+                          device_map="auto", device="cuda", authorize_gpu=False, trusted_checkpoint=False, **kwargs):
+    if kwargs.get("trust_remote_code") is True:raise ValueError("Dynamic model code is unsupported by the local Bunny loader")
+    kwargs.pop("trust_remote_code",None)
+    from checkpoint_io import require_trusted
+    if not trusted_checkpoint:
+        if any(v for k,v in locals().items() if k in ('pruned_model_path','mm','lora')) or kwargs.get('use_safetensors') is False:
+            require_trusted(trusted_checkpoint)
+        kwargs['use_safetensors']=True
+    elif trusted_checkpoint is not True:
+        require_trusted(trusted_checkpoint)
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
     from runtime_policy import admit_placement
@@ -332,7 +369,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
             model = BunnyPhi3ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True,
                                                          config=lora_cfg_pretrained, **kwargs)
         elif model_type == 'stablelm-2':
-            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=True, trust_remote_code=False)
             model = BunnyStableLMForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True,
                                                              config=lora_cfg_pretrained, **kwargs)
         elif model_type == 'qwen1.5-1.8b':
@@ -359,7 +396,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
 
         print('Loading additional Bunny weights...')
         if os.path.exists(os.path.join(model_path, 'non_lora_trainables.bin')):
-            non_lora_trainables = torch.load(os.path.join(model_path, 'non_lora_trainables.bin'), map_location='cpu')
+            non_lora_trainables = checkpoint_io.load_tensors(os.path.join(model_path, 'non_lora_trainables.bin'), trusted=trusted_checkpoint)
         else:
             # this is probably from HF Hub
             from huggingface_hub import hf_hub_download
@@ -368,7 +405,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
                     repo_id=repo_id,
                     filename=filename,
                     subfolder=subfolder)
-                return torch.load(cache_file, map_location='cpu')
+                return checkpoint_io.load_tensors(cache_file, trusted=trusted_checkpoint)
 
             non_lora_trainables = load_from_hf(model_path, 'non_lora_trainables.bin')
 
@@ -399,7 +436,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
             model = BunnyPhi3ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True,
                                                          config=cfg_pretrained, **kwargs)
         elif model_type == 'stablelm-2':
-            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=True, trust_remote_code=False)
             model = BunnyStableLMForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True,
                                                              config=cfg_pretrained, **kwargs)
         elif model_type == 'qwen1.5-1.8b':
@@ -415,7 +452,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
             model = BunnyLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained,
                                                           **kwargs)
 
-        mm_projector_weights = torch.load(os.path.join(model_path, 'mm_projector.bin'), map_location='cpu')
+        mm_projector_weights = checkpoint_io.load_tensors(os.path.join(model_path, 'mm_projector.bin'), trusted=trusted_checkpoint)
         mm_projector_weights = {k: v.to(torch.float16) for k, v in mm_projector_weights.items()}
         model.load_state_dict(mm_projector_weights, strict=False)
     else:
@@ -426,7 +463,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
             tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
             model = BunnyPhi3ForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
         elif model_type == 'stablelm-2':
-            tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, trust_remote_code=False)
             model = BunnyStableLMForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
         elif model_type == 'qwen1.5-1.8b':
             tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)

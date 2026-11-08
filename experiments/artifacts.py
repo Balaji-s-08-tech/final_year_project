@@ -26,7 +26,8 @@ def inspect_artifact(path):
         return unknown
     if sidecar.stat().st_size > 1024 * 1024:
         raise ValueError("Artifact metadata exceeds the 1 MiB header limit")
-    metadata = json.loads(sidecar.read_text(), object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
+    from experiments.jsonio import loads
+    metadata = loads(sidecar.read_text())
     if not isinstance(metadata, dict):
         raise ValueError("Artifact metadata must be an object")
     if type(metadata.get("schema_version")) is not int or metadata["schema_version"] != 1 or metadata.get("filename") != path.name:

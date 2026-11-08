@@ -193,10 +193,14 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
 
 def load_artifact(run_path,*,trusted=False,max_load_bytes=64*1024*1024):
     from VLM.quantization.awq_model_loader import _torch_load, _enable_project_imports
-    root=Path(run_path); manifest=read_json(root/'artifact_manifest.json'); path=root/'model.pt'
-    if not trusted or path.stat().st_size>max_load_bytes: raise ValueError('Trusted bounded CPU artifact required')
+    from checkpoint_io import require_trusted,admit_size
+    require_trusted(trusted)
+    root=Path(run_path); path=root/'model.pt'
+    admit_size(path,max_load_bytes)
+    manifest=read_json(root/'artifact_manifest.json')
+    if trusted is not True or path.stat().st_size>max_load_bytes: raise ValueError('Trusted bounded CPU artifact required')
     if file_hash(path,None)['sha256']!=manifest['sha256']: raise ValueError('Artifact content mismatch')
-    _enable_project_imports(); payload=_torch_load(path)
+    _enable_project_imports(); payload=_torch_load(path,trusted=trusted,max_load_bytes=max_load_bytes)
     if payload.get('format')!='vlm-compression-v1': raise ValueError('Unknown pipeline artifact')
     admit_model(payload['model'])
     from evaluation.integrity import validate_packed

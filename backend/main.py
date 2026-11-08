@@ -145,10 +145,11 @@ def create_inference(request: JobRequest):
 
 @app.get("/api/benchmarks")
 def benchmark_results():
+    from experiments.store import read_json
     manifests = []
     for path in (PROJECT_ROOT / "checkpoints").rglob("benchmark_manifest.json"):
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = read_json(path)
             if isinstance(payload, dict) and isinstance(payload.get("results"), dict):
                 results = payload["results"]
                 metadata = payload.get("metadata", {})
@@ -191,6 +192,9 @@ def _has_numeric_measurement(results: dict) -> bool:
 
 @app.post("/api/results/import", status_code=201)
 def import_results(request: ImportResultsRequest):
+    from experiments.jsonio import validate
+    try: validate(request.manifest)
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
     manifest = request.manifest
     if isinstance(manifest.get("results"), dict):
         results = manifest["results"]
@@ -235,7 +239,8 @@ def import_results(request: ImportResultsRequest):
 
 @app.get("/api/experiments")
 def experiment_history():
-    return [{"path": str(run.path), "experiment": json.loads((run.path / "experiment.json").read_text()), "state": run.latest()}
+    from experiments.store import read_json
+    return [{"path": str(run.path), "experiment": read_json(run.path / "experiment.json"), "state": run.latest()}
             for run in ExperimentStore(OUTPUT_ROOT / "experiments", PROJECT_ROOT).runs()]
 
 

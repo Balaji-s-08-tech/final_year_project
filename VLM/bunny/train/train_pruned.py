@@ -1,3 +1,4 @@
+import checkpoint_io
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
@@ -108,7 +109,7 @@ def maybe_zero_3(param, ignore_status=False, name=None):
 def load_non_lora_trainable_params(model, lora_path):
     weight_path = os.path.join(lora_path, 'non_lora_trainables.bin')
     assert os.path.exists(weight_path), f"non_lora_trainables.bin not found at {weight_path}"
-    non_lora_trainables = torch.load(weight_path, map_location='cpu')
+    non_lora_trainables = checkpoint_io.load_tensors(weight_path, trusted=False)
     non_lora_trainables = {(k[18:] if k.startswith('module.base_model.') else k): v for k, v in non_lora_trainables.items()}
     non_lora_trainables = {(k[11:] if k.startswith('base_model.') else k): v for k, v in non_lora_trainables.items()}
     if any(k.startswith('model.model.') for k in non_lora_trainables):
@@ -119,7 +120,7 @@ def load_non_lora_trainable_params(model, lora_path):
 def load_mm_projector(model, mm_projector_folder):
     mm_projector_path = os.path.join(mm_projector_folder, 'mm_projector.bin')
     assert os.path.exists(mm_projector_path), f"mm_projector.bin not found at {mm_projector_path}"
-    mm_projector_weights = torch.load(mm_projector_path, map_location='cpu')
+    mm_projector_weights = checkpoint_io.load_tensors(mm_projector_path, trusted=False)
     mm_projector_weights = {k: v.to(torch.float16) for k, v in mm_projector_weights.items()}
     model.load_state_dict(mm_projector_weights, strict=False)
     return model

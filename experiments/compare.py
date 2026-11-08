@@ -102,12 +102,26 @@ def compare(baseline, candidate, *, max_asset_hash_bytes=8*1024*1024):
     elif errors: verification='NOT_VERIFIED'
     elif conditional: verification='CONDITIONALLY_VERIFIED'
     else: verification='VERIFIED'
-    report.update(verification_status=verification,evidence_errors=errors,conditional_evidence=conditional,exclusions=exclusions,
+    protocol_verification=verification
+    from experiments.schema import UNITS
+    measured=[]
+    for e in evidence:
+        metrics=e['state'].get('metrics',{}).get('metrics',{}) if isinstance(e['state'].get('metrics',{}),dict) else {}
+        measured.append({k:v for k,v in metrics.items() if isinstance(v,dict) and v.get('status')=='MEASURED'})
+    common=[k for k in measured[0].keys() & measured[1].keys() if measured[0][k].get('unit')==measured[1][k].get('unit') and measured[0][k].get('method')==measured[1][k].get('method')]
+    if not common:
+        exclusions.append({'path':str(candidate),'reasons':['No common valid measured metric with matching units/method']})
+        verification='NON_COMPARABLE'
+        for delta in report['deltas'].values():
+            if delta.get('difference') is not None:delta.update(difference=None,status='EXCLUDED_NO_MEASUREMENTS')
+    report.update(protocol_verification_status=protocol_verification, common_measured_metrics=sorted(common),
+        measurement_coverage=[{'status':'COMPLETE' if len(m)==len(UNITS) else 'PARTIAL' if m else 'NONE','measured':sorted(m),'not_measured':sorted(set(UNITS)-m.keys())} for m in measured],
+        verification_status=verification,evidence_errors=errors,conditional_evidence=conditional,exclusions=exclusions,
         eligible_for_measured_comparison=verification in ('VERIFIED','CONDITIONALLY_VERIFIED'),
         equivalent_protocol_verified=verification=='VERIFIED',
         comparison_status={'VERIFIED':'COMPARABLE','CONDITIONALLY_VERIFIED':'CONDITIONALLY_COMPARABLE','NOT_VERIFIED':'NOT_VERIFIED','NON_COMPARABLE':'NON_COMPARABLE'}[verification])
     for delta in report['deltas'].values():
-        if exclusions: delta.update(difference=None,status='EXCLUDED_INVALID_RUN')
+        if exclusions and delta['status']!='MISSING_OR_INCOMPARABLE': delta.update(difference=None,status='EXCLUDED_INVALID_RUN')
         elif verification not in ('VERIFIED','CONDITIONALLY_VERIFIED') and delta['status']!='MISSING_OR_INCOMPARABLE':
             delta['status']='DIAGNOSTIC_ONLY_'+verification
     return report

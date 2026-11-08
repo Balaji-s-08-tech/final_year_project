@@ -16,15 +16,18 @@ def reconstruction_error(reference, reconstructed):
 
 
 def verify_checkpoint(path, *, trusted=False, max_load_bytes=64*1024*1024):
+    from checkpoint_io import require_trusted,admit_size
+    require_trusted(trusted)
     path=Path(path)
-    if not trusted or path.stat().st_size > max_load_bytes:
+    admit_size(path,max_load_bytes)
+    if trusted is not True or path.stat().st_size > max_load_bytes:
         raise ValueError('Trusted local artifact and explicit sufficient CPU load budget required')
     from experiments.artifacts import inspect_artifact
     from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint
     from VLM.quantization.awq_quantize import PackedAWQLinear, _effective_group_size
     outer=inspect_artifact(path)
     if outer['format'] != 'portable_awq': raise ValueError('Verified portable metadata is required')
-    _,model,inner=load_quantized_bunny_checkpoint(str(path))
+    _,model,inner=load_quantized_bunny_checkpoint(str(path),trusted=trusted,max_load_bytes=max_load_bytes)
     admit_model(model)
     if any((t.is_floating_point() or t.is_complex()) and not torch.isfinite(t).all() for t in model.state_dict().values()):
         raise ValueError('Nonfinite checkpoint state')

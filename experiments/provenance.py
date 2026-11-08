@@ -12,6 +12,8 @@ from pathlib import Path
 
 
 def canonical_hash(value):
+    from experiments.jsonio import validate
+    validate(value)
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 

@@ -19,7 +19,7 @@ def test_awq_load_and_backend_gates_precede_model_access(tmp_path):
     from VLM.quantization.awq_quantize import _device
     from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint
     from backend.jobs import JobManager
-    for operation in [lambda: _device("cuda"), lambda: load_quantized_bunny_checkpoint("missing", "cuda"),
+    for operation in [lambda: _device("cuda"), lambda: load_quantized_bunny_checkpoint("missing", "cuda", trusted=True),
                       lambda: JobManager(experiment_root=tmp_path).submit({"operation": "quantize", "device": "cuda"})]:
         with pytest.raises(PermissionError): operation()
 

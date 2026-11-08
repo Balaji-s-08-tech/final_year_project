@@ -186,7 +186,7 @@ def test_lora_recovery_explicitly_unsupported(tmp_path):
     directory=tmp_path/'lora'; directory.mkdir(); (directory/'adapter_config.json').write_text('{}')
     checkpoint=tmp_path/'pruned.pt'; torch.save({},checkpoint)
     with pytest.raises(ValueError,match='UNSUPPORTED recovery'):
-        load_bunny_recovered_model(base_model='local-only',pruned_checkpoint=str(checkpoint),recovery_checkpoint=str(directory))
+        load_bunny_recovered_model(base_model='local-only',pruned_checkpoint=str(checkpoint),recovery_checkpoint=str(directory), trusted=True)
 
 
 def test_legacy_sampler_fails_before_acquisition():

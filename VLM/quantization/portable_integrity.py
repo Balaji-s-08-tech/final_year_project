@@ -24,6 +24,12 @@ def validate_architecture(document):
     for block in blocks:
         if not isinstance(block,dict):raise ValueError('Invalid decoder descriptor')
         h=positive(block.get('hidden'),'residual width');i=positive(block.get('intermediate'),'MLP width')
+        norm=block.get('qk_normalization')
+        if not isinstance(norm,dict) or type(norm.get('enabled')) is not bool:raise ValueError('Missing/invalid qk_layernorm normalization declaration')
+        requested=config.get('qk_layernorm',False)
+        if type(requested)is not bool or norm['enabled']!=requested:raise ValueError('qk_layernorm configuration conflict')
+        expected_shape=[h] if requested else None
+        if norm.get('query_shape')!=expected_shape or norm.get('key_shape')!=expected_shape:raise ValueError('Unsupported query/key normalization dimensions')
         if not fixture:
             if h!=hidden or block.get('heads')!=heads or type(block.get('heads')) is not int or block.get('head_dim')!=hidden//heads or type(block.get('head_dim')) is not int:raise ValueError('Attention head dimension mismatch')
             rotary=positive(block.get('rotary_dim'),'rotary_dim')
@@ -43,7 +49,18 @@ def describe(model):
     from VLM.quantization.awq_quantize import PackedAWQLinear
     for block in model.model.layers:
         linears={name:[m.in_features,m.out_features] for name in ('self_attn.q_proj','self_attn.k_proj','self_attn.v_proj','self_attn.dense','mlp.fc1','mlp.fc2') for m in [block.get_submodule(name)]}
-        descriptor={'hidden':block.mlp.fc1.in_features,'intermediate':block.mlp.fc1.out_features,'linears':linears}
+        enabled=getattr(block.self_attn,'qk_layernorm',False)
+        if type(enabled)is not bool or enabled!=config.get('qk_layernorm',False):raise ValueError('qk_layernorm normalization configuration conflict')
+        shapes=[]
+        for name in ('q_layernorm','k_layernorm'):
+            norm=getattr(block.self_attn,name,None)
+            if enabled:
+                if not isinstance(norm,torch.nn.LayerNorm):raise ValueError('Unsupported query/key normalization type')
+                shape=list(norm.normalized_shape)
+                if shape!=[block.mlp.fc1.in_features] or (norm.weight is not None and list(norm.weight.shape)!=shape) or (norm.bias is not None and list(norm.bias.shape)!=shape):raise ValueError('Unsupported query/key normalization dimensions')
+                shapes.append(shape)
+            else:shapes.append(None)
+        descriptor={'qk_normalization':{'enabled':enabled,'query_shape':shapes[0],'key_shape':shapes[1]},'hidden':block.mlp.fc1.in_features,'intermediate':block.mlp.fc1.out_features,'linears':linears}
         if config.get('model_type')!='tiny-phi2':
             attention=block.self_attn
             for name,expected in [('hidden_size',config['hidden_size']),('num_key_value_heads',config.get('num_key_value_heads',config['num_attention_heads'])),('num_key_value_groups',1)]:
@@ -68,13 +85,15 @@ def validate_precision(precision,quantization,packed):
     return bits
 
 
-def header(path):
+def header(path, *, max_hash_bytes=64*1024*1024):
     from experiments.artifacts import inspect_artifact
     from experiments.evidence import document
-    outer=inspect_artifact(path)
-    if outer.get('format')!='portable_awq':raise ValueError('Portable checkpoint requires a verified declarative sidecar; legacy unchecked pickle is unsupported')
     from pathlib import Path
-    info=document(Path(str(path)+'.metadata.json'))
+    sidecar=Path(str(path)+'.metadata.json')
+    try:
+        if sidecar.stat().st_size>1024*1024:raise ValueError('Portable sidecar exceeds 1 MiB')
+        info=document(sidecar)
+    except OSError as exc:raise ValueError('Portable checkpoint requires a verified declarative sidecar; legacy unchecked pickle is unsupported') from exc
     validate_architecture(info.get('architecture'))
     validate_precision(info.get('precision'),info.get('quantization'),info.get('packed_layers'))
     for name,data in info['packed_layers'].items():
@@ -88,6 +107,12 @@ def header(path):
     requested=calibration.get('group_size')
     if type(requested)is not int or (requested<1 and requested!=-1):raise ValueError('Invalid requested group size in header')
     if info.get('model_config_sha256')!=canonical_hash(info['architecture']['config']):raise ValueError('Header config hash mismatch')
+    # Reject invalid declarations before reading the large payload.
+    from checkpoint_io import admit_size
+    if max_hash_bytes is not None:admit_size(path,max_hash_bytes)
+    outer=inspect_artifact(path)
+    if outer.get('format')!='portable_awq':raise ValueError('Unsupported portable format')
+    if document(sidecar)!=info:raise ValueError('Portable header changed during admission')
     return info
 
 

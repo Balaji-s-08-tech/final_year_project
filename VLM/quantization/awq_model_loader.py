@@ -21,17 +21,13 @@ def _enable_project_imports() -> None:
             sys.path.insert(0, string_path)
 
 
-def _torch_load(path: Path):
-    # weights_only=False is required because the base pruner stores the altered
-    # ModuleList itself.  Checkpoints must therefore be treated as trusted files.
-    try:
-        return torch.load(path, map_location="cpu", weights_only=False)
-    except TypeError:  # PyTorch before weights_only was introduced
-        return torch.load(path, map_location="cpu")
+def _torch_load(path: Path, *, trusted=False, max_load_bytes=64*1024*1024):
+    from checkpoint_io import load_pickle
+    return load_pickle(path, trusted=trusted, max_load_bytes=max_load_bytes)
 
 
-def _load_recovery_state(model, recovery_checkpoint: Path) -> None:
-    state = _torch_load(recovery_checkpoint)
+def _load_recovery_state(model, recovery_checkpoint: Path, *, trusted=False) -> None:
+    state = _torch_load(recovery_checkpoint, trusted=trusted)
     if isinstance(state, dict) and "model" in state and hasattr(state["model"], "state_dict"):
         state = state["model"].state_dict()
     if not isinstance(state, dict) or not all(isinstance(key, str) for key in state):
@@ -62,6 +58,7 @@ def load_bunny_recovered_model(
     recovery_checkpoint: Optional[str],
     device: str = "cpu",
     authorize_gpu: bool = False,
+    trusted: bool = False,
 ) -> Tuple[object, torch.nn.Module, dict]:
     """Load the *structured-pruned + recovered* Bunny Phi-2 model.
 
@@ -72,12 +69,14 @@ def load_bunny_recovered_model(
     """
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from checkpoint_io import require_trusted
+    require_trusted(trusted)
     _enable_project_imports()
     if recovery_checkpoint is not None and not Path(recovery_checkpoint).exists():
         raise FileNotFoundError(f"Explicit recovery checkpoint is unavailable: {recovery_checkpoint}")
     selected = Path(recovery_checkpoint or pruned_checkpoint or "")
     if selected.is_file():
-        payload = _torch_load(selected)
+        payload = _torch_load(selected, trusted=trusted)
         if isinstance(payload, dict) and "model" in payload and hasattr(payload["model"], "state_dict"):
             model = payload["model"]
             tokenizer = payload.get("tokenizer")
@@ -107,9 +106,9 @@ def load_bunny_recovered_model(
         if not (Path(recovery_checkpoint) / "adapter_config.json").is_file():
             raise ValueError("Recovery directory must be a merged LoRA directory containing adapter_config.json.")
         raise ValueError('UNSUPPORTED recovery format: LoRA coverage and training lineage require a validated manifest')
-    tokenizer, model = load_pruned_bunny_model(base_model, str(prune_path), lora=lora, device=device, device_map=None, authorize_gpu=authorize_gpu)
+    tokenizer, model = load_pruned_bunny_model(base_model, str(prune_path), lora=lora, device=device, device_map=None, authorize_gpu=authorize_gpu, trusted_checkpoint=trusted)
     if recovery_checkpoint and Path(recovery_checkpoint).is_file():
-        _load_recovery_state(model, Path(recovery_checkpoint))
+        _load_recovery_state(model, Path(recovery_checkpoint), trusted=trusted)
     model.to(device)
     model.eval()
     return tokenizer, model, {
@@ -122,14 +121,18 @@ def load_bunny_recovered_model(
     }
 
 
-def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize_gpu=False):
+def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize_gpu=False, trusted=False, max_load_bytes=64*1024*1024):
     """Load a portable AWQ output made by :mod:`awq_quantize`."""
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from checkpoint_io import require_trusted
+    require_trusted(trusted)
     from VLM.quantization.portable_integrity import header, reconcile
-    admission = header(path)  # Validate dimensions/precision before pickle constructs modules.
+    from checkpoint_io import admit_size
+    admit_size(path,max_load_bytes)
+    admission = header(path,max_hash_bytes=max_load_bytes)  # Validate dimensions/precision before pickle constructs modules.
     _enable_project_imports()
-    payload = _torch_load(Path(path))
+    payload = _torch_load(Path(path), trusted=trusted,max_load_bytes=max_load_bytes)
     reconcile(payload, admission)
     if not isinstance(payload, dict) or payload.get("format") != "bunny-awq-portable-v1":
         raise ValueError("Not a Bunny portable AWQ checkpoint.")

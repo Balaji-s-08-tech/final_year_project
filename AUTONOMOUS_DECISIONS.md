@@ -94,3 +94,11 @@ scientific credibility instead of claiming full-model success from unit tests.
 - Alternatives: a new safe state-dict-only model factory would remove more pickle risk but requires a separately validated model/tokenizer/vision reconstruction contract. Current work does not claim that capability or safe untrusted deserialization.
 - Risks: strict supported Phi attention contract rejects unvalidated GQA/head-pruned models; unavailable historical assets prevent VERIFIED; complete model/encoder/scorer/source evidence and real hardware remain external requirements.
 - Validation: four pre-fix regressions failed; adversarial and complete CPU evidence is in Mission 11 report/progress. No existing tests weakened, packages installed, assets downloaded or GPU jobs run. NO-GO retained for Mission 12.
+
+## Mission 13 initial repair decisions (cycles 1–5)
+- Use one recursive JSON numeric contract rather than selected numeric leaf checks. INT64/binary64 limits are explicit; parsing underflow/overflow is rejected.
+- Validate the vendored Phi normalization interface as implemented; reject unsupported layouts rather than reshape silently. Real model assets remain unverified.
+- Separate protocol identity from common measured result coverage. Fully unmeasured/failed results cannot enter admitted measured collections.
+- Require literal explicit pickle trust at every supported public boundary. Safetensors is preferred; restricted tensor pickle still requires trust. Legacy unported binary training paths fail closed.
+- Deliberate compatibility change: migrate fixture calls and explicit CLI invocations to pass trust while retaining assertions. No grandfathered automatic consent.
+- Default checkpoint load budget is 64 MiB; trust and cheap declarative checks precede artifact reads/deserialization. Consent and hashes are not authentication or sandboxing.

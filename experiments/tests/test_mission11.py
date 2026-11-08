@@ -57,14 +57,14 @@ def test_failed_runs_excluded(tmp_path,monkeypatch):
 def test_portable_metadata_conflict(tmp_path):
     model,tok,*_=fixture();model.model.layers[0].mlp.fc1=PackedAWQLinear.from_linear(model.model.layers[0].mlp.fc1,4,8)
     p=tmp_path/'model.pt';torch.save({'format':'bunny-awq-portable-v1','model':model,'tokenizer':tok,'metadata':{'quantization':{'bits':8}}},p)
-    with pytest.raises(ValueError):load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError):load_quantized_bunny_checkpoint(str(p), trusted=True)
 
 
 def test_invalid_attention_rejected(tmp_path):
     model,tok,*_=fixture();model.model.layers[0].self_attn.q_proj=torch.nn.Linear(16,15)
     model.model.layers[0].mlp.fc1=PackedAWQLinear.from_linear(model.model.layers[0].mlp.fc1,4,8)
     p=tmp_path/'model.pt';torch.save({'format':'bunny-awq-portable-v1','model':model,'tokenizer':tok,'metadata':{}},p)
-    with pytest.raises(ValueError):load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError):load_quantized_bunny_checkpoint(str(p), trusted=True)
 
 
 @pytest.mark.parametrize('damage',['empty','null','list','bad_hash','missing_files','null_generation','missing_generation','invalid_bool','bad_config_hash','conflicting_hash'])
@@ -131,7 +131,7 @@ def test_header_rejects_invalid_attention_before_pickle(tmp_path,monkeypatch,fie
     data['architecture']['config'][field]=value;data['model_config_sha256']=canonical_hash(data['architecture']['config']);rewrite(side,data)
     import VLM.quantization.awq_model_loader as loader
     monkeypatch.setattr(loader,'_torch_load',lambda *a:pytest.fail('Constructed pickle before invalid header rejection'))
-    with pytest.raises(ValueError):loader.load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError):loader.load_quantized_bunny_checkpoint(str(p), trusted=True)
 
 
 @pytest.mark.parametrize('precision,bits',[('INT4',4),('AWQ INT8',4),('AWQ INT3',3),('AWQ INT4',True),('AWQ INT4',None)])
@@ -139,19 +139,19 @@ def test_header_precision_rejected_before_pickle(tmp_path,monkeypatch,precision,
     p=exported(tmp_path);side=Path(str(p)+'.metadata.json');data=read_json(side);data['precision']=precision;data['quantization']['bits']=bits;rewrite(side,data)
     import VLM.quantization.awq_model_loader as loader
     monkeypatch.setattr(loader,'_torch_load',lambda *a:pytest.fail('Constructed invalid precision payload'))
-    with pytest.raises(ValueError):loader.load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError):loader.load_quantized_bunny_checkpoint(str(p), trusted=True)
 
 
 def test_inner_metadata_reconciled(tmp_path):
     from experiments.provenance import file_hash
     p=exported(tmp_path);payload=torch.load(p,weights_only=False);payload['metadata']['quantization']['bits']=8;torch.save(payload,p)
     side=Path(str(p)+'.metadata.json');data=read_json(side);digest=file_hash(p,None);data.update(sha256=digest['sha256'],size_bytes=digest['size_bytes']);rewrite(side,data)
-    with pytest.raises(ValueError,match='Inner/outer precision'):load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError,match='Inner/outer precision'):load_quantized_bunny_checkpoint(str(p), trusted=True)
 
 
 @pytest.mark.parametrize('bits',[4,8])
 def test_valid_portable_forward_and_comparison_boundary(tmp_path,monkeypatch,bits):
-    p=exported(tmp_path/'export',bits);_,model,metadata=load_quantized_bunny_checkpoint(str(p))
+    p=exported(tmp_path/'export',bits);_,model,metadata=load_quantized_bunny_checkpoint(str(p), trusted=True)
     assert torch.isfinite(model(torch.tensor([[1,4]])).logits).all()
     runs=pair(tmp_path/'runs',monkeypatch)
     for r in runs:
@@ -199,11 +199,11 @@ def test_header_projection_conflict_rejected_before_pickle(tmp_path,monkeypatch)
     p=exported(tmp_path);side=Path(str(p)+'.metadata.json');data=read_json(side);data['architecture']['blocks'][0]['linears']['self_attn.q_proj']=[16,15];rewrite(side,data)
     import VLM.quantization.awq_model_loader as loader
     monkeypatch.setattr(loader,'_torch_load',lambda *a:pytest.fail('Unpickled invalid projection'))
-    with pytest.raises(ValueError,match='projection dimensions'):loader.load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError,match='projection dimensions'):loader.load_quantized_bunny_checkpoint(str(p), trusted=True)
 
 
 def test_conflicting_calibration_group_size_rejected(tmp_path):
     from experiments.provenance import file_hash
     p=exported(tmp_path);payload=torch.load(p,weights_only=False);payload['metadata']['quantization']['group_size']=3;torch.save(payload,p)
     side=Path(str(p)+'.metadata.json');data=read_json(side);digest=file_hash(p,None);data.update(sha256=digest['sha256'],size_bytes=digest['size_bytes']);rewrite(side,data)
-    with pytest.raises(ValueError,match='configuration conflict'):load_quantized_bunny_checkpoint(str(p))
+    with pytest.raises(ValueError,match='configuration conflict'):load_quantized_bunny_checkpoint(str(p), trusted=True)

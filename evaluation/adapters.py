@@ -46,7 +46,7 @@ class LocalAdapter:
             if config.treatment != f"awq_int{metadata['quantization']['bits']}":
                 raise ValueError("Configured treatment contradicts verified artifact precision")
             from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint
-            self.tokenizer, self.model, _ = load_quantized_bunny_checkpoint(config.model_path, config.device, authorize_gpu=getattr(self, "authorize_gpu", False))
+            self.tokenizer, self.model, _ = load_quantized_bunny_checkpoint(config.model_path, config.device, authorize_gpu=getattr(self, "authorize_gpu", False), trusted=config.trusted_checkpoint)
             from VLM.quantization.awq_quantize import PackedAWQLinear
             bits = {m.bits for m in self.model.modules() if isinstance(m, PackedAWQLinear)}
             if bits != {metadata["quantization"]["bits"]}:
@@ -73,7 +73,7 @@ class LocalAdapter:
             model_config.continuous_training = False
             self.tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, trust_remote_code=False)
             self.model, loading = BunnyPhiForCausalLM.from_pretrained(local, config=model_config, local_files_only=True,
-                torch_dtype=getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True)
+                torch_dtype=getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True, use_safetensors=True if not config.trusted_checkpoint else None)
             missing = [k for k in loading["missing_keys"] if "vision_tower" not in k]
             if missing or loading.get("mismatched_keys") or loading.get("unexpected_keys"):
                 raise ValueError(f"Checkpoint tensor compatibility failed: {loading}")

@@ -41,12 +41,15 @@ def publish(path, writer):
 
 
 def write_json(path, value):
+    from experiments.jsonio import validate
+    validate(value)
     payload = json.dumps(value, indent=2, sort_keys=True, allow_nan=False).encode()
     publish(path, lambda stream: stream.write(payload))
 
 
 def read_json(path):
-    return json.loads(Path(path).read_text())
+    from experiments.jsonio import loads
+    return loads(Path(path).read_text())
 
 
 class Run:

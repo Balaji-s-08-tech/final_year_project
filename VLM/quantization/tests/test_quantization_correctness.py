@@ -154,7 +154,7 @@ def test_portable_checkpoint_preserves_quantized_model_outputs(tmp_path, bits):
     with torch.inference_mode():
         expected = model(input_ids=inputs).logits.clone()
     checkpoint = _save_output(tmp_path, model, TinyTokenizer(), AWQConfig(bits=bits), {"source_format": "test-fixture"}, {})
-    tokenizer, loaded, metadata = load_quantized_bunny_checkpoint(str(checkpoint))
+    tokenizer, loaded, metadata = load_quantized_bunny_checkpoint(str(checkpoint), trusted=True)
     assert isinstance(tokenizer, TinyTokenizer)
     assert metadata["quantization"]["bits"] == bits
     with torch.inference_mode():

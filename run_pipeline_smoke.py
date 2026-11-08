@@ -1,4 +1,5 @@
 """End-to-end pipeline smoke test: Pruning (Taylor-FO) -> AWQ INT4."""
+import checkpoint_io
 
 import gc
 import os
@@ -242,7 +243,7 @@ def stage_7_reload_and_verify(tokenizer):
     section("STAGE 7: Reload & Forward Integrity Test")
     from VLM.quantization.awq_quantize import PackedAWQLinear
 
-    payload = torch.load(AWQ_CKPT_PATH, map_location="cpu", weights_only=False)
+    payload = checkpoint_io.load_tensors(AWQ_CKPT_PATH, trusted=False)
     model = payload["model"]
     model.eval()
 
@@ -305,7 +306,7 @@ def main():
     gc.collect()
     torch.cuda.empty_cache()
 
-    ckpt = torch.load(PRUNED_CKPT_PATH, map_location="cpu", weights_only=False)
+    ckpt = checkpoint_io.load_tensors(PRUNED_CKPT_PATH, trusted=False)
     model = ckpt["model"]
     tokenizer = ckpt["tokenizer"]
     del ckpt

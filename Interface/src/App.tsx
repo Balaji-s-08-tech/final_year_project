@@ -24,6 +24,8 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [operation, setOperation] = useState<'quantize' | 'benchmark' | 'inference'>('quantize');
   const [checkpointId, setCheckpointId] = useState('');
+  const [trustedCheckpoint, setTrustedCheckpoint] = useState(false);
+  useEffect(() => setTrustedCheckpoint(false), [checkpointId]);
   const [calibrationId, setCalibrationId] = useState('');
   const [bits, setBits] = useState<4 | 8>(4);
   const [groupSize, setGroupSize] = useState<32 | 64 | 128 | 256>(128);
@@ -84,7 +86,7 @@ export default function App() {
     setSubmitting(true);
     setError('');
     try {
-      const payload: Record<string, unknown> = { operation, checkpoint_id: checkpointId };
+      const payload: Record<string, unknown> = { operation, checkpoint_id: checkpointId, trusted_checkpoint: trustedCheckpoint };
       if (operation === 'quantize') Object.assign(payload, { calibration_id: calibrationId, bits, group_size: groupSize, device: 'cpu' });
       if (operation === 'inference') Object.assign(payload, { prompt, max_new_tokens: maxNewTokens });
       const accepted = await apiService.submitJob(payload);
@@ -182,7 +184,8 @@ export default function App() {
                 {operation === 'inference' && <><label className="block text-xs text-neutral-300">Text prompt<textarea required maxLength={4096} value={prompt} onChange={event => setPrompt(event.target.value)} className="mt-1 block w-full rounded bg-neutral-950 border border-neutral-700 p-2" rows={3} /></label><label className="block text-xs text-neutral-300">Maximum new tokens<input type="number" min={1} max={128} value={maxNewTokens} onChange={event => setMaxNewTokens(Number(event.target.value))} className="mt-1 block w-full rounded bg-neutral-950 border border-neutral-700 p-2" /></label><div className="text-xs text-amber-300">Text only. Image inference is unsupported by the language-only AWQ checkpoint.</div></>}
                 {operation === 'benchmark' && <div className="text-xs text-amber-300">This operation measures artifact size only. Latency, throughput, memory, and task accuracy will report NOT MEASURED.</div>}
                 {activeJob && <div className="text-xs text-amber-300">Another ML job is {activeJob.status}; wait for it to finish before submitting.</div>}
-                <button disabled={submitting || !health || Boolean(activeJob) || !checkpointId || (operation === 'quantize' && !calibrationId)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-neutral-950 font-semibold text-sm disabled:opacity-40"><Play className="w-4 h-4" />{submitting ? 'Submitting…' : 'Submit job'}</button>
+                {operation !== 'benchmark' && <label className="block text-xs text-amber-200"><input type="checkbox" checked={trustedCheckpoint} onChange={event => setTrustedCheckpoint(event.target.checked)} /> I verified this checkpoint’s source and trust it to execute local Python code.</label>}
+                <button disabled={submitting || !health || Boolean(activeJob) || !checkpointId || (operation !== 'benchmark' && !trustedCheckpoint) || (operation === 'quantize' && !calibrationId)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-neutral-950 font-semibold text-sm disabled:opacity-40"><Play className="w-4 h-4" />{submitting ? 'Submitting…' : 'Submit job'}</button>
               </form>
               <div className="space-y-4"><section className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/40"><h2 className="font-semibold mb-3">Recent jobs</h2>{jobs.length === 0 ? <Empty>No jobs have been submitted.</Empty> : <div className="space-y-2">{jobs.slice(0, 12).map(job => <JobCard key={job.id} job={job} onSelect={setSelectedJob} onCancel={cancel} />)}</div>}</section>
                 {selectedJob && <section className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/40"><h2 className="font-semibold">Selected job · {selectedJob.operation}</h2><p className="text-xs text-neutral-400 mt-1">{selectedJob.id}</p><div className="mt-3"><Progress job={selectedJob} /></div>{selectedJob.error && <p className="text-sm text-rose-300 mt-3">{selectedJob.error}</p>}{selectedJob.result && <pre className="mt-3 text-xs whitespace-pre-wrap break-all text-neutral-300">{JSON.stringify(selectedJob.result, null, 2)}</pre>}</section>}</div>

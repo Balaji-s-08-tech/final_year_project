@@ -1,3 +1,4 @@
+from experiments.jsonio import loads as strict_json_loads
 """Versioned exact-match JSONL protocol. No implicit data downloads."""
 import hashlib
 import json
@@ -20,7 +21,7 @@ def load_examples(config):
             digest.update(line)
             if not line.strip():
                 continue
-            record = json.loads(line)
+            record = strict_json_loads(line)
             if not isinstance(record, dict) or set(record) - {"id", "question", "answers", "image"}:
                 raise ValueError("Evaluation records must contain only id/question/answers/image")
             if not isinstance(record.get("id"), str) or not record["id"] or record["id"] in identifiers:

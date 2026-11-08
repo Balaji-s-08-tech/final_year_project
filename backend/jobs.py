@@ -235,6 +235,8 @@ class JobManager:
             command = [sys.executable, "-m", "VLM.quantization.benchmark", "--artifact", str(path), "--output", str(output_file)]
         else:
             raise ValueError("Unsupported job operation.")
+        if request["operation"]=="quantize" and request.get("trusted_checkpoint") is True:
+            command.append("--trust-local-checkpoint")
         command += ["--experiment-dir", str(run.path)]
         # Keep raw stdout/stderr distinct and durable, while forwarding stdout
         # to structured API logs. stderr stays available even if the worker dies.
@@ -264,7 +266,7 @@ class JobManager:
             raise RuntimeError("Cancelled")
         from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint
         import torch
-        tokenizer, model, metadata = load_quantized_bunny_checkpoint(str(path), device="cpu")
+        tokenizer, model, metadata = load_quantized_bunny_checkpoint(str(path), device="cpu", trusted=request.get("trusted_checkpoint",False))
         encoded = tokenizer(request["prompt"], return_tensors="pt", truncation=True, max_length=2048)
         started = time.perf_counter()
         with torch.inference_mode():

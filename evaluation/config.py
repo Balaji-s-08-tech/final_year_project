@@ -1,3 +1,4 @@
+from experiments.jsonio import loads as strict_json_loads
 """Strict configuration: paths resolve relative to the configuration file."""
 from dataclasses import asdict, dataclass, fields
 import json
@@ -84,7 +85,7 @@ class EvaluationConfig:
     @classmethod
     def load(cls, path):
         path = Path(path).resolve()
-        data = json.loads(path.read_text())
+        data = strict_json_loads(path.read_text())
         if not isinstance(data, dict) or set(data) - {f.name for f in fields(cls)}:
             raise ValueError("Configuration must be an object with known fields")
         for key in ("model_path", "dataset_path", "vision_path", "model_manifest_path", "vision_manifest_path"):
