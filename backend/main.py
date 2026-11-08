@@ -173,8 +173,15 @@ def benchmark_results():
             manifests.append({"path": str(run.path), "origin": "local_experiment", "imported_at": None,
                 "source_label": state["run_id"], "metadata": read_json(run.path / "experiment.json"),
                 "results": {"experiment": {"precision": "UNKNOWN", "benchmark": state["metrics"]}}})
-    measured = any(_has_numeric_measurement(item["results"]) for item in manifests)
-    return {"status": "measured" if measured else "not_measured", "items": manifests}
+    valid=[]; invalid=[]; measured=False
+    for item in manifests:
+        try:
+            measured = _has_numeric_measurement(item['results']) or measured
+            valid.append(item)
+        except (ValueError,TypeError,KeyError) as exc:
+            invalid.append({'path':item['path'],'error':str(exc)})
+    manifests=valid
+    return {"status": "measured" if measured else "not_measured", "items": manifests, "invalid_records": invalid}
 
 
 def _has_numeric_measurement(results: dict) -> bool:

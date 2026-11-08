@@ -17,12 +17,17 @@ class SiglipVisionTower(nn.Module):
         if not delay_load:
             self.load_model()
         else:
-            self.cfg_only = SiglipVisionConfig.from_pretrained(self.vision_tower_name)
+            self.cfg_only = SiglipVisionConfig.from_pretrained(self.vision_tower_name, local_files_only=True)
 
     def load_model(self):
-        self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
+        self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name, local_files_only=True)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower = SiglipVisionModel.from_pretrained(self.vision_tower_name)
+        self.vision_tower, coverage = SiglipVisionModel.from_pretrained(self.vision_tower_name, local_files_only=True, output_loading_info=True)
+        if any(coverage.get(key) for key in ('missing_keys','unexpected_keys','mismatched_keys','error_msgs')):
+            raise ValueError(f'Checkpoint encoder coverage failed: {coverage}')
+        from evaluation.integrity import validate_state
+        validate_state(self.vision_tower)
+        self.loading_coverage = coverage
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
@@ -93,9 +98,14 @@ class SiglipVisionTowerS2(SiglipVisionTower):
             self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
 
     def load_model(self):
-        self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
+        self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name, local_files_only=True)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower = SiglipVisionModel.from_pretrained(self.vision_tower_name)
+        self.vision_tower, coverage = SiglipVisionModel.from_pretrained(self.vision_tower_name, local_files_only=True, output_loading_info=True)
+        if any(coverage.get(key) for key in ('missing_keys','unexpected_keys','mismatched_keys','error_msgs')):
+            raise ValueError(f'Checkpoint encoder coverage failed: {coverage}')
+        from evaluation.integrity import validate_state
+        validate_state(self.vision_tower)
+        self.loading_coverage = coverage
         self.vision_tower.requires_grad_(False)
 
         self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size

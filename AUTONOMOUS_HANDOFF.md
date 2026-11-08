@@ -164,3 +164,15 @@ not a substitute for an official named task scorer. Review that choice first.
 
 The next meaningful external experiment is the dense authorized pilot, not a claim
 that all full-model compression/GPU validation is complete.
+
+## Mission 9 superseding integrity handoff
+
+The Mission 8 NO-GO is retained pending independent review. See [repair ledger](docs/reports/MISSION_9_RESEARCH_INTEGRITY_REPAIRS.md) for original failures, root causes, fixes, regressions and limitations. This section supersedes earlier permissive loading/recovery claims.
+
+Dedicated branch: fix/mission-9-research-integrity, based exactly on ba68888. Complete local model_manifest_path and vision_manifest_path are required for real dense evaluation, with matching model identity/revision and fully verified content. Test-generated configs explicitly mark SYNTHETIC_TEST; their measurements remain synthetic. Effective records retain verified manifests and unverified training origin. No assets were acquired.
+
+Encoder loading fails on missing/mismatched tensors; nonfinite state/logits fail before scoring; both multimodal length limits and actual expanded mask/embedding length are enforced. Prediction records retain original/effective counts. Packed exports and loads validate executable dimensions; uniform physical MLP standard reload is covered. Comparison now explicitly reports missing evidence and three comparability states. Actual calibration usage and source/token hashes are retained; raw byte ratios are not research compression claims. Invalid history is isolated and nested suite children discovered.
+
+Unsupported/unverified: full-model compressed multimodal evaluation bridge, heterogeneous standard pretrained reload, LoRA recovery with incomplete lineage, official benchmark scoring, semantic leakage/pretraining contamination, optimized sparse/quantized kernels, real L4 fit/quality/performance. Legacy acquisition sampler fails with a supported-helper instruction. Do not run historical GPU scripts as a substitute.
+
+Next: independently review Mission 9 and rerun CPU regressions; resolve pinned licensed assets, held-out task/scorer, zero-overage/storage policy and separate GPU authorization. Only then consider a small dense diagnostic. No GPU pilot was launched or queued. All real research metrics remain Pending/Not measured.

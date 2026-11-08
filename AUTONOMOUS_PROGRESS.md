@@ -133,3 +133,13 @@ Links: https://github.com/Balaji-s-08-tech/final_year_project/tree/<branch> and
 https://github.com/Balaji-s-08-tech/final_year_project/commit/<SHA>. Main and the
 starting a1b3272 branch were rechecked unchanged. Final real-research metrics remain
 Pending; tests and synthetic CPU file measurements are distinct evidence.
+
+## Mission 9 — critical integrity remediation (2026-11-08)
+- Branch: fix/mission-9-research-integrity; exact parent ba68888bba08ec903e34e45e1098108fd698fd8b. Implementation commit recorded in the subsequent synchronization entry.
+- Completed: fail-closed local encoder/model identity and coverage; finite state/logits; expanded prompt integrity; evidence-based comparison status; packed shape validation and uniform physical MLP reload; calibration/content/history safeguards. Full details and changed functions: docs/reports/MISSION_9_RESEARCH_INTEGRITY_REPAIRS.md.
+- Before repair: ten new regression cases failed on the starting source. Final: 305 passed, zero failures/skips, one existing Starlette/AnyIO deprecation warning, 30.81 seconds. Logs under /workspace/audits/mission9-*.log. All seven synthetic treatments remain exercised. Existing tests retained; tiny random fixture gains explicit SYNTHETIC_TEST origin.
+- Static/frontend: 179 Python source files compiled; diff whitespace check passed; TypeScript and Vite production build passed (1,676 modules).
+- Changed areas: evaluation/adapters/config/inspection/runner plus integrity helper/tests; SigLIP loader; AWQ collection/loading/export; pruning/pipeline; comparison/store; backend history; legacy sampler/warning policy; byte-ratio scope; progress/decisions/handoff/report.
+- Resource usage: existing CPU dependencies and tiny local fixtures only. No package installation, remote model/dataset downloads, paid API use, infrastructure activation or GPU execution.
+- Remaining: independent audit of repairs, exact licensed real assets and acquisition/training lineage, official held-out protocol/scorer, validated full-model compressed multimodal bridge, recovery coverage protocol, billing/storage/overage confirmation and separate GPU authorization. Heterogeneous standard pretrained reload and LoRA recovery without manifests are explicitly unsupported.
+- Status: NO-GO retained. Next task is independent CPU review; no GPU pilot queued. Real metrics remain Pending/Not measured.

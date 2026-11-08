@@ -31,6 +31,8 @@ class EvaluationConfig:
     schema_version: int = 1
     dataset_split: str | None = None
     hash_large_assets: bool = False
+    model_manifest_path: str | None = None
+    vision_manifest_path: str | None = None
 
     def validate(self):
         if type(self.schema_version) is not int or self.schema_version != 1:
@@ -85,7 +87,7 @@ class EvaluationConfig:
         data = json.loads(path.read_text())
         if not isinstance(data, dict) or set(data) - {f.name for f in fields(cls)}:
             raise ValueError("Configuration must be an object with known fields")
-        for key in ("model_path", "dataset_path", "vision_path"):
+        for key in ("model_path", "dataset_path", "vision_path", "model_manifest_path", "vision_manifest_path"):
             if data.get(key):
                 data[key] = str((path.parent / data[key]).resolve())
         return cls(**data).validate()

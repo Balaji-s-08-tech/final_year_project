@@ -127,6 +127,10 @@ def prune(model, config=PruningConfig()):
             block.mlp.fc1 = _slice(a, keep, torch.arange(a.in_features))
             block.mlp.fc2 = _slice(b, torch.arange(b.out_features), keep)
             details.append({'layer':index, 'original_intermediate':a.out_features, 'remaining_intermediate':len(keep), 'kept_neurons':keep.tolist()})
+    widths=[block.mlp.fc1.out_features for block in model.model.layers]
+    if hasattr(model.config,'intermediate_size') and len(set(widths))==1:
+        model.config.intermediate_size=widths[0]
+    model.config.pruned_intermediate_sizes=widths
     return {'schema_version':1, 'configuration':asdict(config), 'parameter_elements_before':before,
             'parameter_elements_after':sum(p.numel() for p in model.parameters()), 'layers':details,
             'scope':'Phi language blocks only', 'checkpoint_size':'NOT_MEASURED', 'speedup':'NOT_MEASURED'}
@@ -135,6 +139,9 @@ def prune(model, config=PruningConfig()):
 def reconstruct_state(model, state):
     """Recreate masks/shapes on a compatible fresh architecture, then strict-load state."""
     admit_model(model)
+    for name,tensor in state.items():
+        if not torch.is_tensor(tensor) or ((tensor.is_floating_point() or tensor.is_complex()) and not torch.isfinite(tensor).all()):
+            raise ValueError(f'Nonfinite or invalid state tensor: {name}')
     replacements = []
     for index, block in enumerate(model.model.layers):
         for suffix in PHI_LINEARS:
@@ -164,4 +171,9 @@ def reconstruct_state(model, state):
     candidate = copy.deepcopy(model)
     for path,new in replacements: set_module(candidate,path,new)
     candidate.load_state_dict(state, strict=True)
+    widths=[b.mlp.fc1.out_features for b in candidate.model.layers]
+    candidate.config.pruned_intermediate_sizes=widths
+    if hasattr(candidate.config,'intermediate_size') and len(set(widths))==1: candidate.config.intermediate_size=widths[0]
+    from evaluation.integrity import validate_state
+    validate_state(candidate)
     return candidate

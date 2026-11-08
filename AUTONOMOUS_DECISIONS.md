@@ -75,3 +75,13 @@ CUDA lock. Keep the first real dense GPU pilot distinct from the bounded synthet
 compression composition path. Stop further work that needs assets, task judgment,
 GPU execution or unverified cross-modal reconstruction. These limits preserve
 scientific credibility instead of claiming full-model success from unit tests.
+
+## Mission 9 — fail closed and preserve evidence
+- Decision: require complete local model/vision manifests for non-synthetic dense evaluation and reject all encoder coverage gaps. Synthetic fixtures explicitly declare SYNTHETIC_TEST; local hashes do not establish training provenance.
+- Context/alternative: Transformers warning-only random replacement was accepted as a baseline. Continuing with warnings risks invalid research; silently allowing missing tensors is rejected.
+- Decision: validate finite state and every generated logits output, reject internal prompt truncation, and preserve FAILED runs rather than aggregate partial successes.
+- Decision: retain diagnostic raw comparison differences while requiring complete evidence for equivalence. Missing evidence is conditional; material contradictions are non-comparable.
+- Decision: update uniform MLP configuration and retain per-layer widths. Heterogeneous pretrained reload and LoRA recovery without validated coverage/lineage remain unsupported; custom state reconstruction remains explicit.
+- Decision: retain filesystem byte ratios with scope/UNVERIFIED metadata; never imply task-quality or runtime benefits. Record actual calibration caps/usage and reject exact text-token leakage.
+- Risks: trusted pickle and synthetic markers are trust declarations, not authentication; full hashes add deliberate local I/O; strict vision coverage may reject full SigLIP exports with unused heads until independently reviewed.
+- Validation: original ten negative regressions failed before repair; final CPU suite and frontend evidence in progress/report. GPU questions remain unanswered and NO-GO remains in force.

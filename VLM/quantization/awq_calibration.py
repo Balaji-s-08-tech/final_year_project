@@ -116,7 +116,9 @@ def collect_linear_inputs(
     prior_modes = [(module, module.training) for module in model.modules()]
     model.eval()
     try:
+        consumed=0
         for input_ids in samples:
+            consumed+=1
             model(input_ids=input_ids.to(device), use_cache=False)
             if all(count <= 0 for count in remaining.values()):
                 break
@@ -128,6 +130,9 @@ def collect_linear_inputs(
         if old_cache is not None:
             model.config.use_cache = old_cache
 
+    model._awq_calibration_observation = {'requested_sequences':len(samples),'forwarded_sequences':consumed,
+        'observed_tokens_per_linear':{name:max_tokens_per_linear-count for name,count in remaining.items()},
+        'modality':'TEXT_ONLY','cap':max_tokens_per_linear}
     result = {name: torch.cat(values, dim=0) for name, values in features.items() if values}
     missing = sorted(set(linears) - set(result))
     if missing:

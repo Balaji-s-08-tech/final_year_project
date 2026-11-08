@@ -93,7 +93,7 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                         latencies.append(latency)
                         result = {"id": record["id"], "prediction": generation.text, "references": record["answers"],
                                   "correct": match, "generated_token_ids": generation.token_ids, "generated_tokens": len(generation.token_ids),
-                                  "prompt_tokens": prepared.prompt_tokens, "generation_latency_seconds": latency}
+                                  "prompt_tokens": prepared.prompt_tokens, "effective_prompt_tokens": prepared.effective_tokens, "truncation_status": "NONE" if prepared.effective_tokens is not None else "UNVERIFIED_SYNTHETIC_ADAPTER", "generation_latency_seconds": latency}
                         write_json(run.path / "predictions" / f"{index:06d}.json", result)
                         predictions.append(result)
                         run.log(f"Evaluated {record['id']}: {len(generation.token_ids)} tokens")

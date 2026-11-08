@@ -15,7 +15,7 @@ def local_checkpoint(path):
         if not isinstance(config, dict):
             raise ValueError("config.json must be an object")
         result.update(config=config, config_sha256=canonical_hash(config))
-        indices = sorted(path.glob("*.index.json"))
+        indices = [p for p in (path/'model.safetensors.index.json',path/'pytorch_model.bin.index.json') if p.is_file()][:1]
         names = set()
         if indices:
             for index in indices:
@@ -24,7 +24,8 @@ def local_checkpoint(path):
                     raise ValueError("Invalid weight shard index")
                 names.update(mapping.values())
         else:
-            names.update(p.name for pattern in ("*.safetensors", "pytorch_model*.bin") for p in path.glob(pattern))
+            preferred=next((p for p in (path/'model.safetensors',path/'pytorch_model.bin') if p.is_file()),None)
+            if preferred is not None: names.add(preferred.name)
         if not names:
             result["errors"].append("No local model weights found")
         total = 0

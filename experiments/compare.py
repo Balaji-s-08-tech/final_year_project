@@ -23,6 +23,21 @@ def compare(baseline, candidate):
             values = [identity[section].get(field) for identity in identities]
             if any(value is None for value in values) or values[0] != values[1]:
                 warnings.append(f"{section}.{field} differs or is unavailable")
+    missing_evidence=[]
+    for section,field in [('model','checkpoint_sha256'),('dataset','evaluation')]:
+        values=[identity[section].get(field) for identity in identities]
+        if any(v is None for v in values): missing_evidence.append(f'{section}.{field}')
+        elif values[0]!=values[1]: warnings.append(f'{section}.{field} differs')
+    for filename in ('assets.json','effective_inference.json'):
+        if not all((run.path/filename).exists() for run in (a,b)): missing_evidence.append(filename)
+    for identity in identities:
+        evaluation=identity['dataset'].get('evaluation') or {}
+        for field in ('split','scorer','prompt_template','max_input_tokens','max_new_tokens'):
+            if evaluation.get(field) is None: missing_evidence.append('dataset.evaluation.'+field)
+        if not identity['source'].get('commit') or identity['source'].get('dirty') is not False:
+            missing_evidence.append('clean_source_commit')
+    if identities[0]['source'].get('commit')!=identities[1]['source'].get('commit'):
+        warnings.append('Source implementation commit differs')
     config_diff = differences(*configs)
     for filename in ("assets.json", "effective_inference.json"):
         paths = [run.path / filename for run in (a, b)]
@@ -31,10 +46,14 @@ def compare(baseline, candidate):
                 warnings.append(f"{filename} differs or is unavailable")
             if filename == "assets.json" and any(path.exists() and any(v.get("status") == "INCOMPLETE" for v in read_json(path).values() if isinstance(v, dict)) for path in paths):
                 warnings.append("Asset identity is incomplete; large checkpoint content was not verified")
+    for run in (a,b):
+        effective=run.path/'effective_inference.json'
+        if effective.exists() and not read_json(effective).get('generation'):
+            missing_evidence.append('effective_generation_configuration')
     if config_diff:
         warnings.append("Configurations differ; assess whether these are treatment or protocol changes")
     environments = [read_json(run.path / "environment.json") for run in (a, b)]
-    for key in ("os", "pytorch", "cuda_runtime", "gpu_query", "cpu"):
+    for key in ("os", "pytorch", "cuda_runtime", "gpu_query", "cpu", "dependencies"):
         if environments[0].get(key) != environments[1].get(key):
             warnings.append(f"Execution environment {key} differs")
     states = [run.latest() for run in (a, b)]
@@ -48,10 +67,12 @@ def compare(baseline, candidate):
         comparable = all(state["status"] == "COMPLETED" for state in states) and all(m.get("status") == "MEASURED" for m in measures)
         comparable = comparable and measures[0].get("unit") == measures[1].get("unit") and measures[0].get("method") == measures[1].get("method")
         deltas[key] = {"difference": measures[1]["value"] - measures[0]["value"] if comparable else None,
-                       "unit": measures[0].get("unit"), "status": ("CONTEXT_DIFFERS" if warnings else "COMPARABLE") if comparable else "MISSING_OR_INCOMPARABLE"}
+                       "unit": measures[0].get("unit"), "status": ("CONTEXT_DIFFERS" if warnings else "CONDITIONALLY_COMPARABLE" if missing_evidence else "COMPARABLE") if comparable else "MISSING_OR_INCOMPARABLE"}
     return {"schema_version": 1, "baseline_run": identities[0]["run_id"], "candidate_run": identities[1]["run_id"],
             "configuration_differences": config_diff, "provenance_differences": differences(identities[0]["model"], identities[1]["model"], "model") | differences(identities[0]["dataset"], identities[1]["dataset"], "dataset"),
-            "warnings": warnings, "equivalent_protocol_verified": not warnings, "deltas": deltas}
+            "warnings": warnings, "missing_evidence": sorted(set(missing_evidence)),
+            "comparison_status": "NON_COMPARABLE" if warnings else "CONDITIONALLY_COMPARABLE" if missing_evidence else "COMPARABLE",
+            "equivalent_protocol_verified": not warnings and not missing_evidence, "deltas": deltas}
 
 
 def csv_report(report):

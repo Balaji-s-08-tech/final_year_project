@@ -9,8 +9,8 @@ from copy import deepcopy
 
 from transformers import AutoTokenizer, AutoConfig, BitsAndBytesConfig, logging
 
-logging.set_verbosity_error()
-warnings.filterwarnings('ignore')
+# Preserve caller logging policy.
+# Preserve warning diagnostics.
 
 def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
     from runtime_policy import admit_device

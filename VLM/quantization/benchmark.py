@@ -49,7 +49,7 @@ def summarize(report):
         result["metrics"]["original_model_size"] = measurement("original_model_size", original, status="MEASURED", method="filesystem_stat")
         compressed = result["metrics"]["compressed_model_size"]["value"]
         if compressed:
-            result["metrics"]["compression_ratio"] = measurement("compression_ratio", original / compressed, status="MEASURED", method="original_artifact_bytes/compressed_artifact_bytes")
+            result["metrics"]["compression_ratio"] = measurement("compression_ratio", original / compressed, status="MEASURED", method="original_artifact_bytes/compressed_artifact_bytes", metadata={"scope":"SUPPLIED_FILESYSTEM_CONTAINERS", "research_equivalence":"UNVERIFIED", "warning":"Raw byte ratio does not establish comparable model compression"})
     return result
 
 

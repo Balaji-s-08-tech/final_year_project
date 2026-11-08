@@ -104,6 +104,8 @@ def _dequantize(qweight: torch.Tensor, scales: torch.Tensor, zeros: torch.Tensor
     for group in range(scales.shape[1]):
         start, end = group * group_size, min((group + 1) * group_size, in_features)
         weight[:, start:end] = (qweight[:, start:end].float() - zeros[:, group, None].float()) * scales[:, group, None]
+    if not torch.isfinite(weight).all():
+        raise ValueError("Quantization grid is not representable without overflow")
     return weight
 
 
@@ -149,6 +151,12 @@ class PackedAWQLinear(nn.Module):
     def from_linear(cls, linear: nn.Linear, bits: int, group_size: int) -> "PackedAWQLinear":
         qweight, scales, zeros = _quant_params(linear.weight.detach(), bits, group_size)
         return cls(linear.in_features, linear.out_features, bits, group_size, linear.bias, qweight, scales, zeros)
+
+    def _apply(self, fn):
+        master = self.scales.detach().clone()
+        result = super()._apply(fn)
+        self.scales = master.to(device=self.packed_weight.device, dtype=torch.float32)
+        return result
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         qweight = _unpack_int4(self.packed_weight, self.in_features) if self.bits == 4 else self.packed_weight
@@ -281,6 +289,7 @@ def quantize_bunny_awq(model: nn.Module, samples: Sequence[torch.Tensor], config
         LOG.info("Calibrating and quantizing Phi block %d/%d", index + 1, len(blocks))
         linears = _block_linears(block)
         features = collect_linear_inputs(model, linears, samples, device, config.max_tokens_per_linear)
+        result.setdefault('calibration_observations',[]).append(dict(model._awq_calibration_observation))
         shared_names = ("self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "mlp.fc1")
         shared = {name: linears[name] for name in shared_names}
         scale = _search_shared_input_scale(shared, features, config)
@@ -314,6 +323,8 @@ def _save_output(output_dir: Path, model: nn.Module, tokenizer, config: AWQConfi
     packed_bits = {module.bits for module in model.modules() if isinstance(module, PackedAWQLinear)}
     if packed_bits != {config.bits}:
         raise ValueError("Export precision must match the model's packed AWQ layers")
+    from evaluation.integrity import validate_packed
+    validate_packed(model)
     output_dir.mkdir(parents=True, exist_ok=True)
     metadata = {"quantization": config.to_dict(), "source": dict(source), "summary": dict(summary), "model_config": model.config.to_dict()}
     metadata_path = output_dir / "awq_config.json"
@@ -376,6 +387,10 @@ def main() -> None:
             tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device, authorize_gpu=config.authorize_gpu)
             texts = load_calibration_text(args.calibration_data)
             samples = build_calibration_samples(tokenizer, texts, config.calibration_samples, config.sequence_length, config.seed)
+            from experiments.provenance import canonical_hash, file_hash
+            source['calibration_provenance'] = {'file':file_hash(args.calibration_data,None),
+                'token_sha256':canonical_hash([t.tolist() for t in samples]),'selected_record_ids':'UNAVAILABLE_TEXT_LOADER',
+                'modality':'TEXT_ONLY','training_lineage':'UNVERIFIED'}
             summary = quantize_bunny_awq(model, samples, config)
             output = Path(args.output_dir) if args.experiment_dir else run.path / "artifacts"
             checkpoint = _save_output(output, model, tokenizer, config, source, summary)

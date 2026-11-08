@@ -32,6 +32,7 @@ def tiny_bunny(tmp_path):
     SiglipImageProcessor(size={"height": 4, "width": 4}).save_pretrained(vision)
     cfg = BunnyPhiConfig(vocab_size=16, hidden_size=16, intermediate_size=32, num_hidden_layers=1,
                          num_attention_heads=2, max_position_embeddings=128, bos_token_id=1, eos_token_id=2, pad_token_id=0)
+    cfg.weight_origin = 'SYNTHETIC_TEST'
     cfg.mm_vision_tower = str(vision)
     cfg.mm_hidden_size = 8
     cfg.mm_projector_type = "mlp2x_gelu"

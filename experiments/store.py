@@ -157,5 +157,5 @@ class ExperimentStore:
         return Run(destination)
 
     def runs(self):
-        return [Run(path.parent) for path in sorted(self.root.glob("*/*/experiment.json"))
+        return [Run(path.parent) for path in sorted(self.root.rglob("experiment.json"))
                 if not any(part.startswith(".") for part in path.relative_to(self.root).parts)]

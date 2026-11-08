@@ -83,9 +83,12 @@ def load_bunny_recovered_model(
             tokenizer = payload.get("tokenizer")
             if tokenizer is None:
                 raise ValueError("Structured checkpoint has no tokenizer. Supply a compatible checkpoint with tokenizer metadata.")
+            from evaluation.integrity import validate_packed
+            validate_packed(model)
             model.to(device)
             model.eval()
             return tokenizer, model, {"source_format": "serialized_structured_model", "source": str(selected),
+                                      "source_content": __import__("experiments.provenance", fromlist=["file_hash"]).file_hash(selected, None),
                                       "recovery_provenance": "UNVERIFIED", "warning": "A serialized model does not establish training/recovery lineage"}
 
     if not base_model or not pruned_checkpoint:
@@ -103,7 +106,7 @@ def load_bunny_recovered_model(
     if recovery_checkpoint and Path(recovery_checkpoint).is_dir():
         if not (Path(recovery_checkpoint) / "adapter_config.json").is_file():
             raise ValueError("Recovery directory must be a merged LoRA directory containing adapter_config.json.")
-        lora = recovery_checkpoint
+        raise ValueError('UNSUPPORTED recovery format: LoRA coverage and training lineage require a validated manifest')
     tokenizer, model = load_pruned_bunny_model(base_model, str(prune_path), lora=lora, device=device, device_map=None, authorize_gpu=authorize_gpu)
     if recovery_checkpoint and Path(recovery_checkpoint).is_file():
         _load_recovery_state(model, Path(recovery_checkpoint))
@@ -126,5 +129,8 @@ def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize
     payload = _torch_load(Path(path))
     if not isinstance(payload, dict) or payload.get("format") != "bunny-awq-portable-v1":
         raise ValueError("Not a Bunny portable AWQ checkpoint.")
+    from evaluation.integrity import validate_packed, guard_logits
+    validate_packed(payload['model'])
     model = payload["model"].to(device).eval()
+    guard_logits(model)
     return payload["tokenizer"], model, payload.get("metadata", {})

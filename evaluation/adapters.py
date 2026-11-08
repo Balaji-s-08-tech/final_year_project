@@ -11,6 +11,7 @@ from evaluation.inspection import architecture
 class Prepared:
     inputs: dict[str, Any]
     prompt_tokens: int
+    effective_tokens: int | None = None
 
 
 @dataclass
@@ -32,6 +33,7 @@ class LocalAdapter:
         from runtime_policy import admit_device
         admit_device(config.device, getattr(self, "authorize_gpu", False))
         self.config = config
+        self.asset_verification = {}
         from VLM.quantization.awq_model_loader import _enable_project_imports
         _enable_project_imports()
         if config.adapter == "portable_awq_text":
@@ -56,6 +58,17 @@ class LocalAdapter:
             model_config = BunnyPhiConfig.from_pretrained(local, local_files_only=True)
             if getattr(model_config, 'quantization_config', None) is not None:
                 raise ValueError('Dense adapter refuses implicit quantized backend activation')
+            origin=getattr(model_config,'weight_origin',None)
+            if origin != 'SYNTHETIC_TEST':
+                from experiments.manifests import verify_model_manifest
+                from experiments.store import read_json
+                for source,manifest_path,identifier,revision in ((local,config.model_manifest_path,config.model_identifier,config.model_revision),(config.vision_path,config.vision_manifest_path,None,None)):
+                    if not manifest_path:
+                        raise ValueError('Unverified pretrained identity: supply complete model/vision content manifests or use explicitly marked SYNTHETIC_TEST fixtures')
+                    document=read_json(manifest_path)
+                    if identifier is not None and (document.get('identifier')!=identifier or document.get('revision')!=revision):
+                        raise ValueError('Checkpoint manifest identity mismatch')
+                    self.asset_verification[str(source)] = verify_model_manifest(source,document,hash_large=True)
             model_config.mm_vision_tower = str(Path(config.vision_path).resolve())
             model_config.continuous_training = False
             self.tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, trust_remote_code=False)
@@ -71,6 +84,10 @@ class LocalAdapter:
                 tower.load_model()
             self.processor = tower.image_processor
             self.model.to(device=config.device, dtype=getattr(torch, config.dtype))
+        from evaluation.integrity import validate_state, guard_logits
+        validate_state(self.model)
+        guard_logits(self.model)
+        self.weight_origin = getattr(self.model.config, 'weight_origin', 'UNVERIFIED_LOCAL')
         self.model.eval()
         if not callable(getattr(self.model, "generate", None)):
             raise ValueError("Checkpoint has no generation interface")
@@ -79,7 +96,7 @@ class LocalAdapter:
         from transformers import GenerationConfig
         self.generation_settings = GenerationConfig.from_dict(self.model.generation_config.to_dict())
         self.generation_settings.update(max_new_tokens=self.config.max_new_tokens, do_sample=False, num_beams=1, use_cache=True, pad_token_id=self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id)
-        return {"generation": self.generation_settings.to_dict(), "model": self.model.config.to_dict(), "tokenizer": {"class": type(self.tokenizer).__name__, "name": self.tokenizer.name_or_path}, "processor": self.processor.to_dict() if hasattr(self, "processor") else None}
+        return {"asset_verification": self.asset_verification, "weight_origin": self.weight_origin, "pretrained_identity": "UNVERIFIED; local loading coverage is not acquisition provenance", "generation": self.generation_settings.to_dict(), "model": self.model.config.to_dict(), "tokenizer": {"class": type(self.tokenizer).__name__, "name": self.tokenizer.name_or_path}, "processor": self.processor.to_dict() if hasattr(self, "processor") else None}
 
     def inspect(self):
         return architecture(self.model)
@@ -106,7 +123,13 @@ class LocalAdapter:
         visual_tokens = self.model.get_vision_tower().num_patches - 1 if self.config.adapter == "bunny_phi" else 0
         if context is not None and length + visual_tokens + self.config.max_new_tokens > context:
             raise ValueError("Expanded visual/text sequence exceeds model context window")
-        return Prepared({key: value.to(self.config.device) for key, value in inputs.items()}, length)
+        expanded = length + visual_tokens
+        limit = getattr(self.model.config, 'tokenizer_model_max_length', None)
+        if limit is not None and expanded > limit:
+            raise ValueError('Multimodal prompt would truncate required content')
+        if self.config.adapter == 'bunny_phi' and (inputs['input_ids'].eq(-200).sum().item()!=1 or length<2):
+            raise ValueError('Invalid image-token boundary')
+        return Prepared({key: value.to(self.config.device) for key, value in inputs.items()}, length, expanded)
 
     def generate(self, prepared):
         pad = self.tokenizer.pad_token_id
@@ -121,6 +144,8 @@ class LocalAdapter:
             # plus inputs_embeds lets the inherited Phi cache slicing stay valid.
             _, _, mask, _, embeds, _ = self.model.prepare_inputs_labels_for_multimodal(
                 inputs["input_ids"], None, inputs["attention_mask"], None, None, inputs.pop("images"))
+            if embeds is None or embeds.shape[1] != prepared.effective_tokens or mask.shape[1] != prepared.effective_tokens:
+                raise ValueError('Effective multimodal prompt differs: truncation/alignment failure')
             inputs["inputs_embeds"] = embeds
             inputs["attention_mask"] = mask
         self.effective()

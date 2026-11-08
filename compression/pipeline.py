@@ -101,6 +101,9 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
         if protocol['task']!='text': raise ValueError('VQA requires an explicit complete multimodal predictor')
         predictor=TextPredictor(tokenizer)
     if getattr(predictor,'task',None)!=protocol['task']: raise ValueError('Predictor modality differs from protocol')
+    heldout_tokens=[tokenizer(protocol['prompt_template'].format(question=r['question']),return_tensors='pt')['input_ids'].tolist() for r in records] if protocol['task']=='text' else []
+    if any(t.tolist() in heldout_tokens for t in calibration_samples):
+        raise ValueError('Calibration token content overlaps held-out evaluation')
     data=[]
     for record in records:
         item=copy.deepcopy(record)
@@ -122,6 +125,8 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
             try:
                 run.log(f'Starting {treatment}; CPU fixture evidence only')
                 model=copy.deepcopy(base_model).eval(); pruning=None
+                from evaluation.integrity import guard_logits
+                guard_logits(model)
                 if treatment in {'unstructured','unstructured_awq','structured_mlp','structured_awq'}:
                     method='mlp_neurons' if treatment.startswith('structured') else 'magnitude_mask'
                     pruning=prune(model,PruningConfig(method=method,sparsity=config.sparsity))
@@ -194,5 +199,7 @@ def load_artifact(run_path,*,trusted=False,max_load_bytes=64*1024*1024):
     _enable_project_imports(); payload=_torch_load(path)
     if payload.get('format')!='vlm-compression-v1': raise ValueError('Unknown pipeline artifact')
     admit_model(payload['model'])
+    from evaluation.integrity import validate_packed
+    validate_packed(payload['model'])
     if architecture(payload['model'])!=payload['metadata']['architecture']: raise ValueError('Reconstructed architecture differs')
     return payload

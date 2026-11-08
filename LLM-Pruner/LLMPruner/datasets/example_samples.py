@@ -157,20 +157,7 @@ def bunny_pruning_loss(model, samples, device=None):
 
 
 def get_bunny(tokenizer, n_samples, seq_len, batch=False, device=None):
-    from bunny.util.data_utils import LazySupervisedDataset, DataArguments
-    from bunny.model.builder import load_pruned_bunny_model_all
-    bunny_root = _require("BUNNY_DATA_PATH", BUNNY_DATA_PATH)
-    if type(n_samples) is not int or n_samples < 1 or type(seq_len) is not int or seq_len < 1:
-        raise ValueError("n_samples and seq_len must be positive integers")
-    target = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    tokenizer, model, processor, _ = load_pruned_bunny_model_all("BAAI/Bunny-v1_0-3B", device=target)
-    if tokenizer.unk_token is not None and tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.unk_token
-    args = DataArguments(data_path=os.path.join(bunny_root, "bunny_695k.json"),
-                         image_folder=os.path.join(bunny_root, "images"), lazy_preprocess=True, image_aspect_ratio="pad")
-    args.image_processor = processor
-    dataset = LazySupervisedDataset(tokenizer=tokenizer, data_path=args.data_path, data_args=args)
-    return prepare_bunny_samples(model, tokenizer, dataset, n_samples, seq_len, batch, target)
+    raise ValueError('UNSUPPORTED legacy acquisition sampler; use prepare_bunny_samples with an existing CPU model and local dataset')
 
 def get_llava(tokenizer, n_samples, seq_len, batch):
     from llava.train.train_pruned import LazySupervisedDataset, DataArguments
