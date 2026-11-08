@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "adapter": "bunny_phi",
+  "model_path": "/mnt/models/bunny",
+  "model_identifier": "BAAI/Bunny-v1_0-3B",
+  "model_revision": "REPLACE_WITH_PINNED_MODEL_REVISION",
+  "vision_path": "/mnt/models/siglip",
+  "dataset_path": "/mnt/eval/heldout.jsonl",
+  "dataset_identifier": "REPLACE_WITH_HELD_OUT_DATASET",
+  "dataset_revision": "REPLACE_WITH_PINNED_DATASET_REVISION",
+  "prompt_template": "USER: <image>\n{question}\nASSISTANT:",
+  "device": "cuda:0",
+  "dtype": "float16",
+  "seed": 42,
+  "max_samples": 32,
+  "max_input_tokens": 256,
+  "max_new_tokens": 32,
+  "warmup_iterations": 3,
+  "batch_size": 1,
+  "treatment": "baseline",
+  "required_free_ram_bytes": 25769803776,
+  "required_free_vram_bytes": 17179869184
+}
