@@ -157,17 +157,18 @@ def lines(path, *, max_bytes=64*1024*1024, max_line_bytes=1024*1024, max_records
             yield line
 
 
-def files(root, pattern, *, max_entries=10000):
+def files(root, pattern, *, max_entries=10000, recursive=True):
     """Bound discovery as well as returned files; do not follow directory symlinks."""
     from fnmatch import fnmatch
     if type(max_entries) is not int or max_entries < 1:
         raise ValueError('Positive discovery budget required')
+    if type(recursive)is not bool:raise ValueError("Discovery recursion policy must be boolean")
     count = 0
     for directory, folders, names in os.walk(root, followlinks=False):
         count += len(folders) + len(names)
         if count > max_entries:
             raise ValueError('File discovery exceeds entry budget')
-        folders[:] = [name for name in folders if not name.startswith('.')]
+        folders[:] = [name for name in folders if not name.startswith('.')] if recursive else []
         for name in names:
             if not name.startswith('.') and fnmatch(name, pattern):
                 yield Path(directory) / name

@@ -66,7 +66,7 @@ class Run:
 
     def latest(self):
         from experiments.jsonio import files
-        revisions = sorted(files(self.path, "state_*.json"))
+        revisions = sorted(files(self.path, "state_*.json", recursive=False))
         if not revisions:
             raise ValueError("Incomplete experiment initialization")
         return read_json(revisions[-1])

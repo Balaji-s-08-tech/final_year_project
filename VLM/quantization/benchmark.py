@@ -86,7 +86,8 @@ def main() -> None:
             payload = {"schema_version": 1, "metadata": {"run_id": run.latest()["run_id"]}, "results": report}
             write_json(output, payload)
             run.log(f"Benchmark manifest: {output}")
-            print(json.dumps(payload, indent=2))
+            # One JSON record avoids a durable job-history revision per pretty-print line.
+            print(json.dumps(payload, separators=(",", ":")))
             if not args.experiment_dir:
                 primary = summarize(report)
                 primary["metrics"]["execution_duration"] = measurement("execution_duration", time.perf_counter() - started, status="MEASURED", method="perf_counter")
