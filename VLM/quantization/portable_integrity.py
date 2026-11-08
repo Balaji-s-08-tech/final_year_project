@@ -44,6 +44,18 @@ def validate_architecture(document):
         if block.get('linears')!=expected:raise ValueError('Attention/MLP projection dimensions contradict residual/config')
         for dims in block['linears'].values():
             if not isinstance(dims,list) or any(type(v)is not int or v<1 for v in dims):raise ValueError('Invalid projection dimensions')
+    interfaces=document.get('interfaces')
+    if not isinstance(interfaces,dict):raise ValueError('Missing Phi residual embedding interfaces')
+    h=blocks[0]['hidden'];v=config.get('vocab_size')
+    dims=interfaces.get('embedding')
+    if not isinstance(dims,list) or len(dims)!=2 or any(type(x)is not int or x<1 for x in dims) or dims[1]!=h:raise ValueError('Invalid embedding/residual dimensions')
+    if not fixture:
+        positive(v,'vocab_size')
+        if dims!=[v,h] or interfaces.get('lm_head')!=[h,v]:raise ValueError('Embedding/LM head metadata conflict')
+        epsilon=config.get('layer_norm_eps')
+        import math
+        if type(epsilon)not in (int,float) or not math.isfinite(epsilon) or epsilon<=0:raise ValueError('Invalid residual normalization epsilon')
+        if interfaces.get('residual_norm')!={'shape':[h],'epsilon':epsilon,'count':len(blocks)+1}:raise ValueError('Residual normalization metadata conflict')
     widths=[b['intermediate'] for b in blocks]
     if config.get('pruned_intermediate_sizes') is not None and config['pruned_intermediate_sizes']!=widths:raise ValueError('Pruning metadata mismatch')
     if not fixture and len(set(widths))==1 and config.get('intermediate_size')!=widths[0]:raise ValueError('MLP configuration mismatch')
@@ -76,7 +88,27 @@ def describe(model):
         blocks.append(descriptor)
     for name,m in model.named_modules():
         if isinstance(m,PackedAWQLinear):packed[name]={'bits':m.bits,'group_size':m.group_size,'in_features':m.in_features,'out_features':m.out_features}
-    architecture=validate_architecture({'schema_version':1,'config':config,'blocks':blocks})
+    # Residual interfaces must agree before export and after trusted reload.
+    hidden=blocks[0]['hidden']
+    embedding=getattr(model.model,'embed_tokens',None)
+    if not isinstance(embedding,torch.nn.Embedding) or embedding.embedding_dim!=hidden or list(embedding.weight.shape)!=[embedding.num_embeddings,hidden]:
+        raise ValueError('Embedding dimensions contradict Phi residual width')
+    interfaces={'embedding':[embedding.num_embeddings,embedding.embedding_dim]}
+    if config.get('model_type')!='tiny-phi2':
+        vocab=positive(config.get('vocab_size'),'vocab_size')
+        head=getattr(model,'lm_head',None)
+        if embedding.num_embeddings!=vocab or not isinstance(head,torch.nn.Linear) or [head.in_features,head.out_features]!=[hidden,vocab] or list(head.weight.shape)!=[vocab,hidden]:
+            raise ValueError('Embedding/LM head dimensions contradict configuration')
+        interfaces['lm_head']=[head.in_features,head.out_features]
+        norms=[getattr(model.model,'final_layernorm',None)]+[getattr(b,'input_layernorm',None) for b in model.model.layers]
+        epsilon=config.get('layer_norm_eps')
+        import math
+        if type(epsilon)not in (int,float) or not math.isfinite(epsilon) or epsilon<=0:raise ValueError('Invalid residual normalization epsilon')
+        for norm in norms:
+            if not isinstance(norm,torch.nn.LayerNorm) or list(norm.normalized_shape)!=[hidden] or norm.eps!=epsilon or any(t is not None and list(t.shape)!=[hidden] for t in (norm.weight,norm.bias)):
+                raise ValueError('Residual normalization dimensions/epsilon contradict configuration')
+        interfaces['residual_norm']={'shape':[hidden],'epsilon':epsilon,'count':len(norms)}
+    architecture=validate_architecture({'schema_version':1,'config':config,'blocks':blocks,'interfaces':interfaces})
     return architecture,packed
 
 
