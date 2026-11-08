@@ -65,7 +65,7 @@ def _diagnostic_compare(baseline, candidate):
         if fallback:
             measures = [m if m.get("status") == "MEASURED" else state.get("metrics", {}).get("metrics", {}).get(fallback, {}) for m, state in zip(measures, states)]
         comparable = all(state["status"] == "COMPLETED" for state in states) and all(m.get("status") == "MEASURED" for m in measures)
-        comparable = comparable and measures[0].get("unit") == measures[1].get("unit") and measures[0].get("method") == measures[1].get("method")
+        comparable = comparable and measures[0].get("unit") == measures[1].get("unit") and measures[0].get("method") == measures[1].get("method") and measures[0].get("metadata") == measures[1].get("metadata")
         deltas[key] = {"difference": measures[1]["value"] - measures[0]["value"] if comparable else None,
                        "unit": measures[0].get("unit"), "status": ("CONTEXT_DIFFERS" if warnings else "CONDITIONALLY_COMPARABLE" if missing_evidence else "COMPARABLE") if comparable else "MISSING_OR_INCOMPARABLE"}
     return {"schema_version": 1, "baseline_run": identities[0]["run_id"], "candidate_run": identities[1]["run_id"],
@@ -109,7 +109,13 @@ def compare(baseline, candidate, *, max_asset_hash_bytes=8*1024*1024):
         metrics=e['state'].get('metrics',{}).get('metrics',{}) if isinstance(e['state'].get('metrics',{}),dict) else {}
         if not isinstance(metrics,dict) or e['exclusions']:metrics={}
         measured.append({k:v for k,v in metrics.items() if k in UNITS and isinstance(v,dict) and v.get('status')=='MEASURED'})
-    common=[k for k in measured[0].keys() & measured[1].keys() if measured[0][k].get('unit')==measured[1][k].get('unit') and measured[0][k].get('method')==measured[1][k].get('method')]
+    conflicts={k:differences(measured[0][k],measured[1][k]) for k in measured[0].keys() & measured[1].keys()
+        if any(measured[0][k].get(field)!=measured[1][k].get(field) for field in ('unit','method','metadata'))}
+    if conflicts:
+        verification=protocol_verification='NON_COMPARABLE'
+        report['warnings'].append('Measured protocol conflicts: '+', '.join(sorted(conflicts)))
+    common=sorted(measured[0].keys() & measured[1].keys() - conflicts.keys())
+    report['metric_protocol_conflicts']=conflicts
     if not common:
         exclusions.append({'path':str(candidate),'reasons':['No common valid measured metric with matching units/method']})
         verification='NON_COMPARABLE'
