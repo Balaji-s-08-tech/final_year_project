@@ -19,16 +19,17 @@ def load_pickle(path, *, trusted=False, max_load_bytes=64*1024*1024):
     return torch.load(Path(path),map_location='cpu',weights_only=False)
 
 
-def load_tensors(path, *, trusted=False):
+def load_tensors(path, *, trusted=False, max_load_bytes=64*1024*1024):
     """Safetensors needs no pickle consent; even restricted .bin loading needs trust.
 
     weights_only is defense in depth, not a sandbox, especially on legacy Torch.
     """
     path=Path(path)
     if path.suffix=='.safetensors':
+        admit_size(path,max_load_bytes)
         from safetensors.torch import load_file
         return load_file(str(path),device='cpu')
     require_trusted(trusted)
-    admit_size(path)
+    admit_size(path,max_load_bytes)
     import torch
     return torch.load(path,map_location='cpu',weights_only=True)
