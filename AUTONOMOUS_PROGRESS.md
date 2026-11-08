@@ -34,3 +34,13 @@ or skips, one existing warning. Protocol/model/dataset templates intentionally d
 not invent unavailable pinned revisions or official scorer decisions. Current code
 changes are manifests and tests; documentation does not claim unavailable assets
 or full reconstruction/GPU validation. Next: architecture-specific pruning.
+
+## Mission 4 — pruning framework
+Protocol prerequisite committed/pushed: 7bd91943b7bddf9b9046860eacb30c64249dadd8.
+Branch feat/mission-4-pruning-framework. Implemented deterministic layer/global
+magnitude masks, physical paired Phi MLP slicing, explicit mask materialization,
+shape/state reconstruction and sparsity reporting. Added eleven tests including
+tiny real Bunny+SigLIP full forward/generation. Full suite: 259 passed, no failures
+or skips, one existing third-party warning. Changed compression/pruning.py, its
+tests and methodology. Attention/vision/projector physical pruning remains explicitly
+unsupported. No GPU/downloads/spending. Next: AWQ calibration and artifact verification.

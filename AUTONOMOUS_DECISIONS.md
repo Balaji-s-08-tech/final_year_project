@@ -32,3 +32,12 @@ Use local manifests and selected ID/image overlap checks rather than claiming
 absence of semantic/pretraining leakage. No official scorer or revision is guessed.
 Validation: tiny real multimodal integration, manifest roundtrip/change rejection,
 CPU suite. Risk: unavailable full assets and large-file hashing remain explicit.
+
+## Pruning implementation boundary
+Use stable magnitude masks for exact shape preservation and paired fc1/fc2
+slicing for physical MLP changes. Alternatives: generic head/channel removal or
+mask-as-speedup claims; rejected without rotary/cache/cross-modal validation.
+No seed-dependent random ranking; ties are stable. Reconstruction strict-loads a
+candidate copy. Risks: masks add storage; physical slicing changes quality and
+needs recovery; no latency claim. Validation: gradients, roundtrips and tiny
+complete multimodal interface on CPU.
