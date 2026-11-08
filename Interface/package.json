@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=3000 --host=127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"import('node:fs').then(({rmSync}) => ['dist', 'server.js'].forEach(path => rmSync(path, {recursive: true, force: true})))\"",

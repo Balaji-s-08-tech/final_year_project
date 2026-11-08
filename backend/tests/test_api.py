@@ -9,7 +9,7 @@ from backend.main import app
 from backend.checkpoints import resolve_approved_path
 
 
-client = TestClient(app)
+client = TestClient(app,base_url="http://localhost:8000",client=("127.0.0.1",50000))
 
 
 def test_health_system_models_and_empty_metrics_are_real():

@@ -31,7 +31,7 @@ def test_api_rejects_bad_versioned_document_with_422(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
     from backend import main
     monkeypatch.setattr(main, "IMPORTED_RESULTS_ROOT", tmp_path / "imports")
-    client = TestClient(main.app)
+    client = TestClient(main.app,base_url="http://localhost:8000",client=("127.0.0.1",50000))
     for malformed in ([], None, {"schema_version": True}):
         response = client.post("/api/results/import", json={"manifest": {"results": {"x": {"precision": "UNKNOWN", "benchmark": malformed}}}})
         assert response.status_code == 422

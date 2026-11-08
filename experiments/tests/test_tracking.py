@@ -301,7 +301,7 @@ def test_versioned_import_and_existing_history_api(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
     from backend import main
     monkeypatch.setattr(main, "IMPORTED_RESULTS_ROOT", tmp_path / "imports")
-    client = TestClient(main.app)
+    client = TestClient(main.app,base_url="http://localhost:8000",client=("127.0.0.1",50000))
     assert client.get("/api/experiments").status_code == 200
     manifest = {"results": {"candidate": {"precision": "UNKNOWN", "benchmark": benchmark()}}}
     response = client.post("/api/results/import", json={"manifest": manifest})

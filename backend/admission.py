@@ -13,6 +13,22 @@ class RequestAdmission:
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
         headers = dict(scope.get('headers', []))
+        # Local-operator prototype only: peer, Host and browser Origin are independent.
+        # Forwarded headers never grant access; reverse-proxy/multi-user deployment is unsupported.
+        from ipaddress import ip_address
+        from urllib.parse import urlsplit
+        from backend.config import FRONTEND_ORIGIN
+        try:
+            peer = scope.get('client')
+            local = bool(peer) and ip_address(peer[0]).is_loopback
+            host = urlsplit('//'+headers.get(b'host',b'').decode('ascii')).hostname
+            local_host = host in ('localhost','127.0.0.1','::1')
+            origin = headers.get(b'origin')
+            allowed_origin = origin is None or origin.decode('ascii') == FRONTEND_ORIGIN
+        except (ValueError, UnicodeError):
+            local = local_host = allowed_origin = False
+        if not (local and local_host and allowed_origin):
+            return await JSONResponse({'detail': 'Local operator API only; peer, Host or Origin not authorized'}, status_code=403)(scope, receive, send)
         length = headers.get(b'content-length')
         try:
             if length is not None and (int(length) < 0 or int(length) > MAX_BODY_BYTES):

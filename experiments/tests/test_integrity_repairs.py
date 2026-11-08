@@ -38,7 +38,7 @@ def test_nested_measured_zero_and_history_are_detected(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(main, "IMPORTED_RESULTS_ROOT", tmp_path / "checkpoints" / "imported_results")
     doc = benchmark({"baseline_accuracy": measurement("baseline_accuracy", 0, status="MEASURED", method="fixture")})
-    client = TestClient(main.app)
+    client = TestClient(main.app,base_url="http://localhost:8000",client=("127.0.0.1",50000))
     result = client.post('/api/results/import', json={"manifest": {"results": {"sample": {"precision": "UNKNOWN", "benchmark": doc}}}})
     assert result.status_code == 201 and result.json()["measured"] is True
     run = ExperimentStore(tmp_path / "checkpoints" / "experiments").create("fixture", {})
