@@ -276,6 +276,12 @@ def stage_7_reload_and_verify(tokenizer):
 
 
 def main():
+    import argparse
+    from runtime_policy import admit_device
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--authorize-gpu-execution", action="store_true")
+    args = parser.parse_args()
+    admit_device("cuda", args.authorize_gpu_execution)
     print("=" * 64)
     print("  VLM COMPRESSION PIPELINE SMOKE TEST")
     print("  Bunny-v1.0-3B / Phi-2")

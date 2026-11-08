@@ -69,6 +69,9 @@ def validate_benchmark(document):
     required = {"value", "unit", "method", "status", "metadata"}
     if any(not isinstance(metric, dict) or set(metric) != required for metric in document["metrics"].values()):
         raise ValueError("Incomplete or unknown measurement fields")
+    for name, metric in document["metrics"].items():
+        if metric["unit"] != UNITS[name] or not isinstance(metric["metadata"], dict):
+            raise ValueError("Serialized units and metadata must be explicit and typed")
     quantization = document.get("quantization")
     if not isinstance(quantization, dict) or not {"method", "bits"}.issubset(quantization):
         raise ValueError("Invalid benchmark schema/version")

@@ -61,6 +61,7 @@ def load_bunny_recovered_model(
     pruned_checkpoint: Optional[str],
     recovery_checkpoint: Optional[str],
     device: str = "cpu",
+    authorize_gpu: bool = False,
 ) -> Tuple[object, torch.nn.Module, dict]:
     """Load the *structured-pruned + recovered* Bunny Phi-2 model.
 
@@ -69,6 +70,8 @@ def load_bunny_recovered_model(
     standalone recovered model; it needs both the base model and this pruned
     checkpoint.  This function enforces that invariant.
     """
+    from runtime_policy import admit_device
+    device = admit_device(device, authorize_gpu)
     _enable_project_imports()
     if recovery_checkpoint is not None and not Path(recovery_checkpoint).exists():
         raise FileNotFoundError(f"Explicit recovery checkpoint is unavailable: {recovery_checkpoint}")
@@ -101,7 +104,7 @@ def load_bunny_recovered_model(
         if not (Path(recovery_checkpoint) / "adapter_config.json").is_file():
             raise ValueError("Recovery directory must be a merged LoRA directory containing adapter_config.json.")
         lora = recovery_checkpoint
-    tokenizer, model = load_pruned_bunny_model(base_model, str(prune_path), lora=lora, device=device, device_map=None)
+    tokenizer, model = load_pruned_bunny_model(base_model, str(prune_path), lora=lora, device=device, device_map=None, authorize_gpu=authorize_gpu)
     if recovery_checkpoint and Path(recovery_checkpoint).is_file():
         _load_recovery_state(model, Path(recovery_checkpoint))
     model.to(device)
@@ -116,8 +119,10 @@ def load_bunny_recovered_model(
     }
 
 
-def load_quantized_bunny_checkpoint(path: str, device: str = "cpu"):
+def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize_gpu=False):
     """Load a portable AWQ output made by :mod:`awq_quantize`."""
+    from runtime_policy import admit_device
+    device = admit_device(device, authorize_gpu)
     payload = _torch_load(Path(path))
     if not isinstance(payload, dict) or payload.get("format") != "bunny-awq-portable-v1":
         raise ValueError("Not a Bunny portable AWQ checkpoint.")

@@ -67,6 +67,8 @@ class JobManager:
             return job.model_copy(deep=True)
 
     def submit(self, payload: dict) -> JobRecord:
+        from runtime_policy import admit_device
+        admit_device(payload.get("device", "cpu"))
         operation = payload["operation"]
         if operation == "inference" and payload.get("image"):
             raise ValueError("The registered AWQ checkpoints are language-only; image inference is not supported.")

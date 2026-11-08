@@ -86,8 +86,10 @@ def test_insufficient_eligible_samples_terminates_instead_of_looping():
 
 def test_text_bound_does_not_slice_batch_dimension():
     model = Model()
-    embeds, labels, mask = prepare_bunny_samples(model, SimpleNamespace(pad_token_id=0), records(), 3, 1, batch=True)
-    assert embeds.shape == (3, 1, 4) and labels.shape == mask.shape == (3, 1)
+    with pytest.raises(ValueError, match="eligible"):
+        prepare_bunny_samples(model, SimpleNamespace(pad_token_id=0), records(), 3, 1, batch=True)
+    embeds, labels, mask = prepare_bunny_samples(model, SimpleNamespace(pad_token_id=0), records(), 3, 2, batch=True)
+    assert embeds.shape == (3, 2, 4) and labels.shape == mask.shape == (3, 2)
 
 
 def test_batched_loss_contract_propagates_labels_and_mask_once():

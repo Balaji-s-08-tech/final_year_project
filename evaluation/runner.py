@@ -22,10 +22,14 @@ def nearest_rank(values, percentile):
 
 
 def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_gpu=False):
+    from runtime_policy import admit_device
+    admit_device(config.device, authorize_gpu)
     config.validate()
     if config.device.startswith("cuda") and not authorize_gpu:
         raise PermissionError("GPU execution requires separate explicit authorization; preflight is read-only")
     report = preflight(config)
+    from evaluation.provenance import asset_manifest
+    assets = asset_manifest(config)
     model = report.get("model", {})
     run = ExperimentStore(output_root).create("baseline_evaluation", config.to_dict(),
         model={"identifier": config.model_identifier, "architecture": config.adapter, "revision": config.model_revision,
@@ -34,6 +38,7 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                  "fingerprint": report["dataset"]["fingerprint"], "evaluation": {"scorer": "normalized_exact_match_v1", "prompt_template": config.prompt_template,
                  "sample_ids": report["dataset"]["sample_ids"], "max_input_tokens": config.max_input_tokens, "max_new_tokens": config.max_new_tokens}},
         source_paths=["evaluation/config.py", "evaluation/runner.py", "evaluation/adapters.py", "evaluation/data.py"])
+    write_json(run.path / "assets.json", assets)
     write_json(run.path / "preflight.json", report)
     run.transition("RUNNING")
     started = time.perf_counter()
@@ -54,7 +59,12 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                     torch.cuda.set_device(config.device)
                     torch.cuda.reset_peak_memory_stats(config.device)
                 active = adapter or LocalAdapter()
+                if isinstance(active, LocalAdapter):
+                    active.authorize_gpu = authorize_gpu
                 active.load(config)
+                write_json(run.path / "effective_inference.json", active.effective() if hasattr(active, "effective") else {"status": "UNAVAILABLE_SYNTHETIC_ADAPTER"})
+                if asset_manifest(config) != assets:
+                    raise ValueError("Model/encoder assets changed during loading")
                 layout = active.inspect()
                 write_json(run.path / "architecture.json", layout)
                 latencies, predictions, total_tokens, correct = [], [], 0, 0

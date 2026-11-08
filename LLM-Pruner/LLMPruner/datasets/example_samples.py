@@ -102,7 +102,7 @@ def prepare_bunny_samples(model, tokenizer, dataset, n_samples, seq_len, batch=F
         if not torch.is_tensor(ids) or not torch.is_tensor(labels) or ids.ndim != 1 or labels.shape != ids.shape:
             raise ValueError("Bunny records require aligned 1-D input_ids and labels")
         ids, labels = ids[:seq_len].clone(), labels[:seq_len].clone()
-        if ids.numel() == 0 or (ids == -200).sum().item() != 1:
+        if ids.numel() < 2 or (ids == -200).sum().item() != 1 or not labels[1:].ne(-100).any():
             continue
         if not torch.is_tensor(image) or image.ndim != 3:
             raise ValueError("Bunny image must be a CHW tensor")
@@ -128,6 +128,8 @@ def prepare_bunny_samples(model, tokenizer, dataset, n_samples, seq_len, batch=F
             raise ValueError("Multimodal preparation did not return embeddings, labels and mask")
         if embeds.shape[:2] != expanded_labels.shape or expanded_labels.shape != expanded_mask.shape:
             raise ValueError("Expanded multimodal tensor shapes are inconsistent")
+        if not all((row[1:] != -100).any() for row in expanded_labels):
+            raise ValueError("Image expansion removed all supervised next-token targets")
         return embeds.detach(), expanded_labels.detach(), expanded_mask.detach()
 
     if batch:
@@ -142,7 +144,12 @@ def bunny_pruning_loss(model, samples, device=None):
     embeds, labels, mask = samples
     if device is not None:
         embeds, labels, mask = (tensor.to(device) for tensor in samples)
-    return model(inputs_embeds=embeds, labels=labels, attention_mask=mask).loss
+    if not all((row[1:] != -100).any() for row in labels):
+        raise ValueError("No supervised next-token targets")
+    loss = model(inputs_embeds=embeds, labels=labels, attention_mask=mask).loss
+    if not torch.isfinite(loss).all():
+        raise ValueError("Nonfinite pruning loss")
+    return loss
 
 
 def get_bunny(tokenizer, n_samples, seq_len, batch=False, device=None):

@@ -24,6 +24,13 @@ def compare(baseline, candidate):
             if any(value is None for value in values) or values[0] != values[1]:
                 warnings.append(f"{section}.{field} differs or is unavailable")
     config_diff = differences(*configs)
+    for filename in ("assets.json", "effective_inference.json"):
+        paths = [run.path / filename for run in (a, b)]
+        if any(path.exists() for path in paths):
+            if not all(path.exists() for path in paths) or read_json(paths[0]) != read_json(paths[1]):
+                warnings.append(f"{filename} differs or is unavailable")
+            if filename == "assets.json" and any(path.exists() and any(v.get("status") == "INCOMPLETE" for v in read_json(path).values() if isinstance(v, dict)) for path in paths):
+                warnings.append("Asset identity is incomplete; large checkpoint content was not verified")
     if config_diff:
         warnings.append("Configurations differ; assess whether these are treatment or protocol changes")
     environments = [read_json(run.path / "environment.json") for run in (a, b)]

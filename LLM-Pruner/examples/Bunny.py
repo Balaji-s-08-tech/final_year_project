@@ -32,6 +32,9 @@ def set_random_seed(seed):
     torch.cuda.manual_seed_all(seed)
     
 def main(args):
+    from runtime_policy import admit_device
+    admit_device(args.device, getattr(args, "authorize_gpu_execution", False))
+    admit_device(args.eval_device, getattr(args, "authorize_gpu_execution", False))
     set_random_seed(args.seed)
 
     if args.short:

@@ -31,7 +31,9 @@ from VLM.quantization.awq_model_loader import load_bunny_recovered_model
 LOG = logging.getLogger("bunny_awq")
 
 
-def _device(value: str) -> torch.device:
+def _device(value: str, authorized: bool = False) -> torch.device:
+    from runtime_policy import admit_device
+    value = admit_device(value, authorized)
     if value == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     result = torch.device(value)
@@ -269,7 +271,9 @@ def _block_linears(block: nn.Module) -> Dict[str, nn.Linear]:
 def quantize_bunny_awq(model: nn.Module, samples: Sequence[torch.Tensor], config: AWQConfig) -> Dict[str, object]:
     """Apply calibration, Phi-2 AWQ scaling/clipping, and packed quantization."""
     config.validate()
-    device = _device(config.device)
+    device = _device(config.device, config.authorize_gpu)
+    from runtime_policy import admit_model
+    admit_model(model, config.authorize_gpu)
     blocks = _phi_blocks(model)
     model.to(device).eval()
     result = {"architecture": "Bunny Phi-2", "blocks": len(blocks), "scaled_groups": 0, "clipped_linears": 0, "quantized_linears": 0}
@@ -293,15 +297,15 @@ def quantize_bunny_awq(model: nn.Module, samples: Sequence[torch.Tensor], config
             result["quantized_linears"] += 1
         del features
         gc.collect()
-        _cleanup_cuda()
+        if device.type == "cuda":
+            _cleanup_cuda()
     return result
 
 
 def _seed_everything(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    # torch.manual_seed schedules CUDA seeding lazily; do not initialize CUDA here.
 
 
 def _save_output(output_dir: Path, model: nn.Module, tokenizer, config: AWQConfig, source: Mapping[str, object], summary: Mapping[str, object]) -> Path:
@@ -344,11 +348,14 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="cpu", help="cpu, cuda, cuda:0, or auto. CPU is the safe default for 6 GB GPUs.")
     parser.add_argument("--pruning_ratio", type=float)
+    parser.add_argument("--authorize-gpu-execution", action="store_true")
     parser.add_argument("--experiment-dir", help="Existing RUNNING parent experiment; backend use")
     args = parser.parse_args()
     if not args.model_path and not args.recovery_checkpoint and not args.pruned_checkpoint:
         parser.error("Provide --model_path or --pruned_checkpoint/--recovery_checkpoint.")
     config = AWQConfig(bits=args.bits, group_size=args.group_size, calibration_samples=args.calibration_samples, sequence_length=args.sequence_length, max_tokens_per_linear=args.max_tokens_per_linear, seed=args.seed, device=args.device, pruning_ratio=args.pruning_ratio)
+    config.authorize_gpu = args.authorize_gpu_execution
+    config.device = str(_device(config.device, config.authorize_gpu))
     config.validate()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     from experiments.store import ExperimentStore, Run
@@ -366,7 +373,7 @@ def main() -> None:
         with record_output(run) if not args.experiment_dir else nullcontext():
             _seed_everything(config.seed)
             recovery = args.recovery_checkpoint or args.model_path
-            tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device)
+            tokenizer, model, source = load_bunny_recovered_model(base_model=args.base_model, pruned_checkpoint=args.pruned_checkpoint, recovery_checkpoint=recovery, device=config.device, authorize_gpu=config.authorize_gpu)
             texts = load_calibration_text(args.calibration_data)
             samples = build_calibration_samples(tokenizer, texts, config.calibration_samples, config.sequence_length, config.seed)
             summary = quantize_bunny_awq(model, samples, config)

@@ -12,7 +12,9 @@ from transformers import AutoTokenizer, AutoConfig, BitsAndBytesConfig, logging
 logging.set_verbosity_error()
 warnings.filterwarnings('ignore')
 
-def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  **kwargs):
+def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
+    from runtime_policy import admit_device
+    device = admit_device(device, authorize_gpu)
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:
@@ -96,7 +98,9 @@ def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, l
     return tokenizer, model
 
 
-def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  **kwargs):
+def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
+    from runtime_policy import admit_device
+    device = admit_device(device, authorize_gpu)
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:
@@ -194,9 +198,11 @@ def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=Non
     print(f"Number of parameters in the model: {model.num_parameters()}")
     return tokenizer, model, image_processor, context_len
 
-def load_distillation_model(teacher_model_path, student_model_path, pruned_model_path, mm=None, lora=None, device_map=None, device="cuda",  **kwargs):
+def load_distillation_model(teacher_model_path, student_model_path, pruned_model_path, mm=None, lora=None, device_map=None, device="cuda",  authorize_gpu=False, **kwargs):
+    from runtime_policy import admit_device
+    device = admit_device(device, authorize_gpu)
     # Load teacher model
-    _, teacher_model = load_pruned_bunny_model(teacher_model_path)
+    _, teacher_model = load_pruned_bunny_model(teacher_model_path, device=device, authorize_gpu=authorize_gpu)
     # Load student model and tokenizer
     if device_map is not None:
         kwargs = {"device_map": device_map, **kwargs}
@@ -244,7 +250,9 @@ def load_distillation_model(teacher_model_path, student_model_path, pruned_model
     
     
 def load_pretrained_model(model_path, model_base, model_name, model_type, load_8bit=False, load_4bit=False,
-                          device_map="auto", device="cuda", **kwargs):
+                          device_map="auto", device="cuda", authorize_gpu=False, **kwargs):
+    from runtime_policy import admit_device
+    device = admit_device(device, authorize_gpu)
     if model_type not in {'phi-1.5', 'phi-2', 'phi-3', 'stablelm-2', 'qwen1.5-1.8b', 'minicpm', 'llama3-8b'}:
         raise ValueError(f"Unknown Model Type {model_type}")
 

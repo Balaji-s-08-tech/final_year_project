@@ -56,6 +56,8 @@ def _weight_files(path: Path) -> bool:
 
 
 def _load_and_forward(args: argparse.Namespace, torch: object) -> dict[str, object]:
+    from runtime_policy import admit_device
+    admit_device("cuda", getattr(args, "authorize_gpu_execution", False))
     if not getattr(args, "authorize_gpu_execution", False):
         raise PermissionError("Model/GPU execution requires separate explicit authorization")
     os.environ["HF_HUB_OFFLINE"] = "1"
@@ -89,7 +91,7 @@ def _load_and_forward(args: argparse.Namespace, torch: object) -> dict[str, obje
     tokenizer, model = load_pruned_bunny_model(
         str(model_dir),
         pruned_model_path=None,
-        device="cuda",
+        device="cuda", authorize_gpu=True,
         device_map={"": "cuda"},
     )
     existing_tower = model.get_vision_tower()

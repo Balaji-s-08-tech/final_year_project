@@ -21,6 +21,7 @@ class AWQConfig:
     seed: int = 42
     device: str = "cpu"
     dtype: str = "float16"
+    authorize_gpu: bool = False
     pruning_ratio: Optional[float] = None
 
     def validate(self) -> None:

@@ -40,11 +40,12 @@ def system_info():
     try:
         import torch
         cuda["version"] = torch.version.cuda
-        cuda["available"] = torch.cuda.is_available()
-        if cuda["available"]:
-            props = torch.cuda.get_device_properties(0)
-            free_bytes, total_bytes = torch.cuda.mem_get_info(0)
-            cuda.update({"name": props.name, "memory_total_bytes": total_bytes, "memory_allocated_bytes": torch.cuda.memory_allocated(0), "memory_reserved_bytes": torch.cuda.memory_reserved(0), "memory_free_bytes": free_bytes})
+        from experiments.provenance import capture
+        _, observed = capture(PROJECT_ROOT)
+        cuda["available"] = bool(observed.get("gpu_devices") and torch.version.cuda)
+        if observed.get("gpu_devices"):
+            device = observed["gpu_devices"][0]
+            cuda.update(name=device["model"], memory_free_bytes=device["available_memory_bytes"])
     except Exception as exc:
         cuda["error"] = str(exc)
     return {"python_version": platform.python_version(), "python_executable": sys.executable, "platform": platform.platform(), "torch_version": _torch_version(), "cuda": cuda, "system_ram": {"total_bytes": ram.total, "available_bytes": ram.available, "used_bytes": ram.used, "percent_used": ram.percent}}
@@ -165,19 +166,20 @@ def benchmark_results():
             manifests.append({"path": str(path), "origin": origin, "imported_at": imported_at, "source_label": source_label, "metadata": metadata, "results": results})
         except (OSError, ValueError):
             continue
+    from experiments.store import read_json
+    for run in ExperimentStore(PROJECT_ROOT / "checkpoints" / "experiments", PROJECT_ROOT).runs():
+        state = run.latest()
+        if state["status"] == "COMPLETED" and "metrics" in state:
+            manifests.append({"path": str(run.path), "origin": "local_experiment", "imported_at": None,
+                "source_label": state["run_id"], "metadata": read_json(run.path / "experiment.json"),
+                "results": {"experiment": {"precision": "UNKNOWN", "benchmark": state["metrics"]}}})
     measured = any(_has_numeric_measurement(item["results"]) for item in manifests)
     return {"status": "measured" if measured else "not_measured", "items": manifests}
 
 
 def _has_numeric_measurement(results: dict) -> bool:
-    metric_fields = {"artifact_size_bytes", "peak_gpu_memory", "generation_latency", "tokens_per_second", "task_performance", "accuracy"}
-    for record in results.values():
-        if not isinstance(record, dict):
-            continue
-        for name, value in record.items():
-            if name in metric_fields and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-                return True
-    return False
+    from experiments.results import has_measurement
+    return has_measurement(results)
 
 
 @app.post("/api/results/import", status_code=201)

@@ -29,6 +29,8 @@ class Adapter(Protocol):
 
 class LocalAdapter:
     def load(self, config):
+        from runtime_policy import admit_device
+        admit_device(config.device, getattr(self, "authorize_gpu", False))
         self.config = config
         from VLM.quantization.awq_model_loader import _enable_project_imports
         _enable_project_imports()
@@ -42,7 +44,7 @@ class LocalAdapter:
             if config.treatment != f"awq_int{metadata['quantization']['bits']}":
                 raise ValueError("Configured treatment contradicts verified artifact precision")
             from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint
-            self.tokenizer, self.model, _ = load_quantized_bunny_checkpoint(config.model_path, config.device)
+            self.tokenizer, self.model, _ = load_quantized_bunny_checkpoint(config.model_path, config.device, authorize_gpu=getattr(self, "authorize_gpu", False))
             from VLM.quantization.awq_quantize import PackedAWQLinear
             bits = {m.bits for m in self.model.modules() if isinstance(m, PackedAWQLinear)}
             if bits != {metadata["quantization"]["bits"]}:
@@ -70,6 +72,12 @@ class LocalAdapter:
         self.model.eval()
         if not callable(getattr(self.model, "generate", None)):
             raise ValueError("Checkpoint has no generation interface")
+
+    def effective(self):
+        from transformers import GenerationConfig
+        self.generation_settings = GenerationConfig.from_dict(self.model.generation_config.to_dict())
+        self.generation_settings.update(max_new_tokens=self.config.max_new_tokens, do_sample=False, num_beams=1, use_cache=True, pad_token_id=self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id)
+        return {"generation": self.generation_settings.to_dict(), "model": self.model.config.to_dict(), "tokenizer": {"class": type(self.tokenizer).__name__, "name": self.tokenizer.name_or_path}, "processor": self.processor.to_dict() if hasattr(self, "processor") else None}
 
     def inspect(self):
         return architecture(self.model)
@@ -113,7 +121,8 @@ class LocalAdapter:
                 inputs["input_ids"], None, inputs["attention_mask"], None, None, inputs.pop("images"))
             inputs["inputs_embeds"] = embeds
             inputs["attention_mask"] = mask
-        return self.model.generate(**inputs, max_new_tokens=self.config.max_new_tokens,
+        self.effective()
+        return self.model.generate(**inputs, generation_config=self.generation_settings, max_new_tokens=self.config.max_new_tokens,
                                    do_sample=False, num_beams=1, use_cache=True, pad_token_id=pad)
 
     def decode(self, prepared, output):
