@@ -49,3 +49,13 @@ can survive via a view. Restore mixed training/cache state on exceptions. Requir
 trusted pickle plus a bounded load budget for artifact verification; no hidden large
 model load. Tensor reconstruction error is separate from task quality. Validation:
 INT4/INT8 export/reload, hooks/modes failure recovery, tiny values and full suite.
+
+## Combined suite and evidence boundary
+Use explicit small CPU inputs, clone the dense base, bind actual state/calibration/
+data/effective settings and preserve every treatment run. Choose prune then recalibrate
+AWQ; packed-then-physical slicing is unsupported. Keep masks in prune-only exports,
+materialize before AWQ. All variants use one generic trusted container; measure its
+actual bytes but make no speed or real-quality claim. Mandatory modality-specific
+predictor/effective settings prevent accidental text/vision score mixing. CLI has
+no real-model or GPU load option. Validation: all seven text treatments, tiny real
+multimodal combined path, serialization, failure and overlap/budget rejection.

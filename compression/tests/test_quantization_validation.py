@@ -46,3 +46,11 @@ def test_calibration_count_and_config_types_fail_explicitly():
     with pytest.raises(ValueError): build_calibration_samples(TinyTokenizer(),['one'],2,8,42)
     with pytest.raises(ValueError): AWQConfig(bits=True).validate()
     with pytest.raises(ValueError): _bounded_append([],torch.tensor([[float('nan')]]),1)
+
+
+@pytest.mark.parametrize('bias',[1e-12,1e10])
+def test_packed_bias_conversion_preserves_float32_range(bias):
+    from VLM.quantization.awq_quantize import PackedAWQLinear
+    source=torch.nn.Linear(2,1); source.weight.data.zero_(); source.bias.data.fill_(bias)
+    packed=PackedAWQLinear.from_linear(source,4,2)
+    torch.testing.assert_close(packed(torch.ones(1,2)),source(torch.ones(1,2)),rtol=1e-6,atol=0)

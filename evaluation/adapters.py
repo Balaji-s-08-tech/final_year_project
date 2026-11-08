@@ -82,8 +82,8 @@ class LocalAdapter:
     def inspect(self):
         return architecture(self.model)
 
-    def prepare(self, record):
-        prompt = self.config.prompt_template.format(question=record["question"])
+    def prepare(self, record, *, formatted=False):
+        prompt = record["question"] if formatted else self.config.prompt_template.format(question=record["question"])
         if self.config.adapter == "bunny_phi":
             from PIL import Image
             from bunny.util.mm_utils import tokenizer_image_token, process_images

@@ -55,3 +55,18 @@ packing, scales and zero points). Five new tests; full suite 264 passed, no fail
 or skips, one existing warning. Real calibration/data quality remain Not measured.
 Changed AWQ config/calibration/summary, compression quantization utilities/tests and
 methodology. No GPU/downloads/spending. Next: consistent combined experiment suite.
+
+## Mission 6 — combined CPU pipeline
+Mission 5 committed/pushed: cf40401e8c59e37b32a3b23831e6b9940cb9865c.
+Branch feat/mission-6-compression-pipeline. Seven immutable treatments share actual
+base-state/data/calibration/effective-inference identities, with disjoint IDs,
+modality and strict CPU budget gates. Added standard artifact/hash/reload contracts,
+JSON/CSV reports, failure records, configuration and a synthetic-only CLI. Five
+pipeline tests include every text treatment and a real tiny Bunny/SigLIP combined
+MLP+AWQ visual path. Added two precision-conversion regressions after discovering
+packed bias FP16 conversion could underflow/overflow; preserve source bias dtype.
+Full suite: 271 passed, no failures/skips, one existing warning. The CLI configuration
+option is validated in final handoff checks. No GPU/large model execution.
+Changed pipeline/synthetic CLI/tests, adapter formatted-prompt support, quantization
+bias/finite-state validation and methodology/configuration. Next: final research
+package, exact reproduction commands, asset/billing blockers and quality audit.

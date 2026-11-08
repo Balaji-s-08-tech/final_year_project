@@ -1,0 +1,10 @@
+{
+  "treatments": ["dense", "unstructured", "structured_mlp", "awq_int4", "awq_int8", "unstructured_awq", "structured_awq"],
+  "sparsity": 0.25,
+  "group_size": 8,
+  "seed": 42,
+  "max_parameter_elements": 1000000,
+  "max_model_bytes": 67108864,
+  "scale_grid": 3,
+  "clip_grid": 4
+}

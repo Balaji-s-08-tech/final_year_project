@@ -143,7 +143,7 @@ class PackedAWQLinear(nn.Module):
             raise ValueError("PackedAWQLinear supports 4- or 8-bit weights.")
         self.register_buffer("scales", scales.to(torch.float32))
         self.register_buffer("zero_points", zeros)
-        self.register_buffer("bias", None if bias is None else bias.detach().to(torch.float16))
+        self.register_buffer("bias", None if bias is None else bias.detach().clone())
 
     @classmethod
     def from_linear(cls, linear: nn.Linear, bits: int, group_size: int) -> "PackedAWQLinear":

@@ -26,6 +26,8 @@ def verify_checkpoint(path, *, trusted=False, max_load_bytes=64*1024*1024):
     if outer['format'] != 'portable_awq': raise ValueError('Verified portable metadata is required')
     _,model,inner=load_quantized_bunny_checkpoint(str(path))
     admit_model(model)
+    if any((t.is_floating_point() or t.is_complex()) and not torch.isfinite(t).all() for t in model.state_dict().values()):
+        raise ValueError('Nonfinite checkpoint state')
     bits=outer['quantization']['bits']
     config=inner.get('quantization',{})
     if config.get('bits') != bits or config.get('group_size') in (None,0):
