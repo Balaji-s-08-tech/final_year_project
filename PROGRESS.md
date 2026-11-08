@@ -113,3 +113,54 @@ Required outside actions: confirm Camber exhaustion/overage behavior, explicitly
 authorize any GPU execution, stage licensed pinned model/vision/data assets within
 the actual storage quota, and select the held-out evaluation/scoring protocol.
 Until then, do not use the GPU acknowledgement flags or expand to cloud experiments.
+
+## Session commit ledger and review paths
+
+| Increment | Commit | Branch |
+| --- | --- | --- |
+| Mission 3 evaluation preparation | bce0b4c504ea82fdb4b3d41e0fe7814e081c12cd | feat/baseline-evaluation-003 |
+| Sampler and loss inputs | 09cbef69a4e264a1623276e129e0933a15bbfea2 | fix/research-input-validation-004 |
+| Artifact/recovery validation | 98b245ec217824312d1ad18d4d8c29dd7bb7c29c | fix/research-input-validation-004 |
+| GPU admission and metric documents | fc37786422b8e29bbb81b52e7945882d6347d7bf | fix/research-input-validation-004 |
+
+All four code increments were pushed without merge or force push. Mission 1/2
+branch tips and the original work branch (`66c1d25252114451532786420b1e92e16de8a778`)
+were verified unchanged. The repair branch stacks all completed work. GitHub API
+Forbidden prevented draft PR creation; no draft PR is claimed. Review branches:
+
+- https://github.com/Balaji-s-08-tech/final_year_project/tree/feat/baseline-evaluation-003
+- https://github.com/Balaji-s-08-tech/final_year_project/tree/fix/research-input-validation-004
+
+Changed paths relative to Mission 2 (excluding ephemeral test outputs):
+
+```text
+CLOUD_EXECUTION.md
+LLM-Pruner/LLMPruner/datasets/example_samples.py
+LLM-Pruner/examples/Bunny.py
+LLM-Pruner/tests/test_bunny_samples.py
+PROGRESS.md
+README.md
+VLM/quantization/awq_model_loader.py
+VLM/quantization/tests/test_recovery_validation.py
+cloud/bunny_gpu_probe.py
+cloud/evaluation_preflight.sh
+cloud/tests/test_probe_policy.py
+configs/evaluation/bunny_l4_baseline.json
+docs/BASELINE_EVALUATION.md
+docs/RESEARCH_INPUT_REPAIRS.md
+docs/reports/MISSION_003_COMPATIBILITY.md
+evaluation/__init__.py
+evaluation/__main__.py
+evaluation/adapters.py
+evaluation/config.py
+evaluation/data.py
+evaluation/inspection.py
+evaluation/preflight.py
+evaluation/runner.py
+evaluation/tests/test_baseline.py
+experiments/artifacts.py
+experiments/schema.py
+experiments/tests/test_artifact_validation.py
+experiments/tests/test_metric_document_validation.py
+experiments/tests/test_tracking.py
+```
