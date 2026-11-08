@@ -2,9 +2,9 @@
 
 ## 1. Executive verdict
 
-**NO-GO for real-asset, GPU and research execution.** The controlled CPU implementation improved, but passing tests do not close the remaining input, legacy, asset, protocol and financial gates. Eight remediation scopes were completed; final adversarial review found two additional reproducible medium-severity gaps that remain open at the cycle ceiling. A copied legacy pruner also remains unguarded; it was inspected statically and never executed.
+**NO-GO for real-asset, GPU and research execution.** The controlled CPU implementation improved, but passing tests do not close the remaining input, legacy, asset, protocol and financial gates. Eight remediation scopes were completed; final adversarial review found three additional reproducible medium-severity gaps that remain open at the cycle ceiling. A copied legacy pruner also remains unguarded; it was inspected statically and never executed.
 
-Mission 13's unchanged source independently passed **409 tests**. Mission 14's final repository suite passed **477 tests, zero failures/skips**, including **68 new adversarial regressions**. Separately, **three external known-open assertions fail**, covering the CLI history reader and two asset-inventory readers. Those failures are disclosed, not counted as passing regressions. No real accuracy, speed, VRAM, compression benefit or real checkpoint compatibility was established.
+Mission 13's unchanged source independently passed **409 tests**. Mission 14's final repository suite passed **477 tests, zero failures/skips**, including **68 new adversarial regressions**. Separately, **five external known-open assertions fail**, covering CLI history, two asset-inventory readers and two extreme-exponent validation/collection cases. Those failures are disclosed, not counted as passing regressions. No real accuracy, speed, VRAM, compression benefit or real checkpoint compatibility was established.
 
 Evidence is IMPLEMENTED, CPU-VALIDATED or SYNTHETICALLY-VALIDATED only. No feature acquired REAL-ASSET-VALIDATED, GPU-VALIDATED or RESEARCH-VALIDATED status.
 
@@ -23,7 +23,7 @@ Initial state, original file hashes, full patch, exact source snapshot and failu
 
 | Previous claim | Independent inspection/evidence | Result and limit |
 | --- | --- | --- |
-| Numeric overflow/underflow cannot establish verification | Shared `experiments.jsonio`, public compare/evidence paths, negative exponent/INT64/nested tests and new independent strict-input probes | PASS for numeric contract. Resource exhaustion was a separate reproduced gap. |
+| Numeric overflow/underflow cannot establish verification | Shared `experiments.jsonio`, public compare/evidence paths, negative exponent/INT64/nested tests and new independent strict-input probes | PASS for ordinary numeric/overflow cases; FAIL for extreme-underflow exception isolation (R4). Resource exhaustion was a separate reproduced gap. |
 | Query/key normalization matches vendored Phi forward | Inspected normalization before head reshape, descriptor flag/shape/epsilon reconciliation; actual tiny enabled-normalization forward/export/reload test | PASS on synthetic Phi. Full embedding/residual interfaces were incomplete; repaired in F4. |
 | Completed but unmeasured runs are excluded | Inspected schema/lifecycle/evidence/common-metric coverage; empty, failed, cancelled and malformed regression paths | PASS for measured admission tested. A single common measured metric is partial coverage, not proof of useful task quality. |
 | Pickle requires literal acknowledgement | Traced public portable/recovery/state/combined/verifier and legacy tensor paths to `checkpoint_io`; rejection spies run before deserialization | PASS within explicit trusted-local policy. Consent was not bound to changed content and safetensors lacked a budget; repaired in F5/F6. |
@@ -150,6 +150,16 @@ The first bounded discovery implementation made `Run.latest` recurse into artifa
 
 `LLM-Pruner/hf_prune.py` has a reachable script main and unguarded pretrained acquisition, and a shipped shell wrapper invokes it. The historic evaluation shell also contains file mutation and CUDA execution. This is a static reachability finding, not a reproduced runtime acquisition or exploit; execution was forbidden. These are unsupported standalone routes, not found reachable from the supported app. Proposed next bounded fix: inventory remaining standalone acquisition/training launchers and quarantine before imports/side effects; retain pure model definitions used by the supported path. Do not execute the scripts to test isolation.
 
+### R4 — MEDIUM / FAIL / OPEN: extreme underflow bypasses validation exception isolation
+
+**Affected:** `experiments/jsonio.py:_float`, reached through `loads`/`read_json`, `experiments.evidence.assess`, `compare_collection` and JSON API admission.
+
+**Reproduction:** `loads('1e-999999999999999999999999999999999999999999')` should reject with the documented validation error. Float conversion produces zero, but `Decimal(text).is_zero()` raises **decimal.InvalidOperation**, not ValueError. Put that literal in a candidate's config.json and compare `[bad_candidate, valid_candidate]`: the exception aborts the entire collection before valid-peer processing. Both assertions fail against unchanged Mission 13 and final audited code; `extreme-exponent-baseline.log` records the original source line. This is exception/availability failure, not evidence of VERIFIED nonfinite measurements.
+
+**Root cause:** the underflow check assumes Decimal construction cannot fail for a JSON token within the character budget; callers isolate ValueError, not Decimal exceptions. The API middleware also lacks this exception normalization.
+
+**Recommended next fix:** normalize bounded decimal-construction failures to a clear ValueError at the JSON trust boundary, or use a reviewed bounded mantissa-based underflow check. Test enormous signed exponents, nonzero/zero mantissas, all public JSON readers, API rejection and mixed comparison peers. Do not merely swallow exceptions in presentation or convert invalid values to zero. No GPU or assets required. Not repaired because remediation had reached the eight-scope ceiling. **Core comparison robustness remains NO-GO until independently fixed/retested.**
+
 ### Other limitations / UNVERIFIED concerns
 
 - All trusted pickle producers and files must be verified externally; `weights_only=True` on Torch 2.2.2 is not a sandbox. No package upgrade or comprehensive vulnerability-advisory audit was performed.
@@ -216,7 +226,7 @@ Final repository suite (prefix applied as environment assignments):
 
 **68 passed, zero failures/skips, one warning, 3.97 s.** The warning is Starlette's use of deprecated AnyIO `BlockingPortal`; it was not hidden.
 
-External remaining-gap probes: `PYTHONPATH=/workspace/final_year_project .venv-vlm-awq/bin/python -m pytest /workspace/audits/mission14/test_open_findings.py -q -p no:cacheprovider --junitxml=/workspace/audits/mission14/open-tests.xml` → **3 failed intentionally**, matching R1 and the two R2 functions. They also reproduce against unchanged source. These are outside the passing repository suite; the project is not asserted defect-free.
+External remaining-gap probes: `PYTHONPATH=/workspace/final_year_project .venv-vlm-awq/bin/python -m pytest /workspace/audits/mission14/test_open_findings.py -q -p no:cacheprovider --junitxml=/workspace/audits/mission14/open-tests.xml` → **5 failed intentionally**, matching R1, both R2 functions and both R4 numeric/collection cases (4.15s). They also reproduce against unchanged source. These are outside the passing repository suite; the project is not asserted defect-free.
 
 Other actual checks:
 
@@ -227,7 +237,7 @@ Other actual checks:
 - AST comparison verified all existing test assertions unchanged. Four TestClient setups were changed only to specify the supported loopback peer/Host. No existing test was removed, skipped or weakened.
 - AST loader/acquisition inventory and source search performed; only central production direct Torch loads found. Installed third-party internals and untrusted producers are outside this claim.
 
-Baseline logs: `baseline-tests.log`/`baseline.xml`. Negative logs: `before.log`, `network-before.log`, `collection-before.log`, `inference-before.log`, `generation-before.log`, `token-interface-before.log`, `pipeline-replacement-before.log`. Intermediate known regression: `after-resource.log`, `timing-investigation.log`, `self-review-before.log`; corrected isolated run `timing-corrected.log`. Final logs: `verified-tests.log`, `adversarial-tests.log`, `open-tests.log`, `frontend.log`, `static-checks.json`, `final-call-inventory.json`.
+Baseline logs: `baseline-tests.log`/`baseline.xml`. Negative logs: `before.log`, `network-before.log`, `collection-before.log`, `inference-before.log`, `generation-before.log`, `token-interface-before.log`, `pipeline-replacement-before.log`, `extreme-exponent-baseline.log`. Intermediate known regression: `after-resource.log`, `timing-investigation.log`, `self-review-before.log`; corrected isolated run `timing-corrected.log`. Final logs: `verified-tests.log`, `adversarial-tests.log`, `open-tests.log`, `frontend.log`, `static-checks.json`, `final-call-inventory.json`.
 
 ## 9. Commit and changed-file inventory
 
@@ -268,10 +278,10 @@ This is an assessment only. No instructions here authorize acquisition, activati
 
 | Category | Verdict | Reason |
 | --- | --- | --- |
-| Repository CPU engineering integrity | CONDITIONAL GO | 477 passing repository tests and actual negative/positive evidence; R1/R2 remain medium, external assertions fail; independent review still needed. |
+| Repository CPU engineering integrity | CONDITIONAL GO | 477 passing repository tests and actual negative/positive evidence; R1/R2/R4 remain medium, external assertions fail; independent review still needed. |
 | Supported-path security readiness | CONDITIONAL GO for owned local-operator fixtures only | Explicit trust, identity and scoped limits; no authentication/sandbox/OS quotas, incomplete asset discovery and third-party parsing bounds. Public deployment NO-GO. |
 | Repository-wide legacy isolation | NO-GO | Ten modules quarantined, remaining independent acquisition/mutation scripts insufficiently isolated. |
-| Experiment tracking/comparison integrity | CONDITIONAL GO for tested local records | Invalid/failed/unmeasured/mismatched records rejected in core comparison, but CLI history is inconsistent and real-treatment bridge/scientific protocol unvalidated. |
+| Experiment tracking/comparison integrity | NO-GO for general comparison robustness | Ordinary invalid/failed/unmeasured/mismatched records are rejected, but R4 can abort whole collections, CLI history is inconsistent, and real-treatment bridge/scientific protocol remains unvalidated. |
 | Real-asset evaluation readiness | NO-GO | Assets, scorer, actual split and complete manifests missing; real compressed multimodal bridge unsupported. |
 | GPU pilot readiness | NO-GO | Independent asset/code review, target fit/runtime, billing limits and separate authorization missing. |
 | Research execution readiness | NO-GO | No approved real dataset/scorer or measured baseline; synthetic success is not research validation. |
@@ -281,7 +291,7 @@ No known remaining critical/high failure was reproduced in the enumerated suppor
 ## 12. Exact resume and prioritized handoff
 
 1. Verify audit branch HEAD, clean status and this report's documentation commit; preserve all original refs. Read `MISSION_14_HANDOFF.md` and external evidence if available. Do not reset/rewrite existing work.
-2. Start a fresh bounded CPU remediation session. First reproduce/fix **R1** through the real history CLI with a malformed peer; add its failing regression and preserve valid records/diagnostics.
+2. Start a fresh bounded CPU remediation session. First reproduce/fix **R4**: normalize the extreme-underflow validation failure at the shared JSON boundary, then verify API rejection and unaffected valid comparison peers. Next fix **R1** through the real history CLI with a malformed peer; add its failing regression and preserve valid records/diagnostics.
 3. Fix **R2**: bound both model/asset inventory traversal and aggregate hashing before materialization, with explicit reviewed profiles, symlink handling and valid large-manifest tests. The 10001-empty-file reproduction requires no models/datasets.
 4. Extend static quarantine review to **R3** and remaining standalone training/acquisition/evaluation launchers; never execute them for testing. Preserve the vendored Phi definitions and pure helpers needed by supported paths.
 5. Review core comparator's strict metadata/asset equivalence before implementing a real cross-treatment study. Do not loosen evidence to make synthetic comparisons look research-valid. Require base lineage, task/split/scorer/effective settings and comparable size/timing definitions.

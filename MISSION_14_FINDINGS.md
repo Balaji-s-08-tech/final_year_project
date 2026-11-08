@@ -16,8 +16,9 @@ Authoritative detail, reproductions, affected interfaces, limits and prerequisit
 | S2 | HIGH, introduced here | Recursive bounded discovery let artifact child state shadow lifecycle | FIXED; direct-directory lookup and negative regression; final full suite rerun |
 | R1 | MEDIUM | One corrupt lifecycle aborts whole CLI history (exit 1, valid peer absent) | FAIL / OPEN at eight-scope ceiling; original and final source reproduced |
 | R2 | MEDIUM | Both asset-inventory functions admit 10001 zero-byte file entries without discovery cap | FAIL / OPEN; two external assertions; no real assets/exhaustion attempt |
+| R4 | MEDIUM | Extreme underflow Decimal construction escapes JSON validation and aborts mixed comparisons | FAIL / OPEN; two negative tests fail on original and final source; normalize at shared trust boundary |
 | R3 | MEDIUM | Standalone hf_prune and historical shell routes retain acquisition/mutation/CUDA paths | FAIL static / OPEN; never executed; not reachable from supported app in inspected call chains |
 
 Unverified concerns remain around third-party config/tokenizer/image parser budgets, process/log/disk/time quotas, same-inode mutation, distributed/PID recovery, dependency vulnerabilities, complete legacy code, S2/alternative architectures and all full-model/GPU behavior. Do not promote them to reproduced exploits or tested guarantees.
 
-Final repository suite: **477 passed**, zero failed/skipped, one third-party warning. New repository probes: **68 passed**. External known-open probes: **3 failed** (R1 and two R2 readers), explicitly excluded from any green-suite claim. Remaining source, protocol and financial gates keep GPU/research **NO-GO**.
+Final repository suite: **477 passed**, zero failed/skipped, one third-party warning. New repository probes: **68 passed**. External known-open probes: **5 failed** (R1, two R2 readers and two R4 numeric/collection paths), explicitly excluded from any green-suite claim. Remaining source, protocol and financial gates keep GPU/research **NO-GO**.
