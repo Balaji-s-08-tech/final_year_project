@@ -143,3 +143,5 @@ Pending; tests and synthetic CPU file measurements are distinct evidence.
 - Resource usage: existing CPU dependencies and tiny local fixtures only. No package installation, remote model/dataset downloads, paid API use, infrastructure activation or GPU execution.
 - Remaining: independent audit of repairs, exact licensed real assets and acquisition/training lineage, official held-out protocol/scorer, validated full-model compressed multimodal bridge, recovery coverage protocol, billing/storage/overage confirmation and separate GPU authorization. Heterogeneous standard pretrained reload and LoRA recovery without manifests are explicitly unsupported.
 - Status: NO-GO retained. Next task is independent CPU review; no GPU pilot queued. Real metrics remain Pending/Not measured.
+
+Mission 9 synchronization: implementation/report commit 92e69f84d74e37acf391cc4e4e409e30f6a483c0 pushed successfully to origin/fix/mission-9-research-integrity. Baseline handoff branch remains ba68888; local work baseline remains 66c1d25. No merge/PR/force push/branch deletion. Subsequent ledger-only commit records this synchronization without changing validated source.
