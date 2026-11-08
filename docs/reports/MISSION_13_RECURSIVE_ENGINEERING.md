@@ -24,3 +24,6 @@ Adversarial review reproduced three combined-loader failures: missing consent re
 
 ## Validation to date
 The initial integrated repair suite passed 368 tests; further public-boundary tests exposed cycle 5 issues before repair. Full source validation and commit inventory are updated in AUTONOMOUS_PROGRESS.md. Remaining cycles will inspect adjacent provenance, lifecycle and evaluation-policy paths; eight cycles is a limit, not a completeness proof.
+
+## Cycle 6 — bind held-out identity to actual selected inputs (high)
+Adjacent review reproduced VERIFIED with a declared dataset hash but no available input source (cycle6-before.log). Comparison now requires an explicit supported local dataset adapter/path/seed/sample count, recomputes the same selected JSONL/image fingerprint as evaluation under the caller's I/O budget, verifies selected IDs, and checks requested versus recorded prompt/token bounds. Missing/changed/unverifiable data cannot be VERIFIED. The existing comparison fixture now supplies a real local synthetic JSONL and derived fingerprint rather than a dummy digest; its assertions remain unchanged. Full CPU suite: 392 passed, one existing third-party warning, 39.20 seconds. Semantic contamination and official benchmark validity remain unverified; this is content/selection consistency, not a task-quality claim.

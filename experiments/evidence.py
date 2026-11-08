@@ -50,6 +50,19 @@ def assess(path, max_asset_hash_bytes=8*1024*1024):
         if not isinstance(evaluation.get(key),str) or not evaluation[key].strip():errors.append(f'Missing/invalid evaluation.{key}')
     for key in ('max_input_tokens','max_new_tokens'):
         if type(evaluation.get(key)) is not int or evaluation[key]<1:errors.append(f'Invalid evaluation.{key}')
+    try:
+        from evaluation.data import load_examples
+        from types import SimpleNamespace
+        if config.get('adapter') not in ('bunny_phi','portable_awq_text'):raise ValueError('Missing supported dataset adapter')
+        for key in ('seed','max_samples'):
+            if type(config.get(key)) is not int or config[key]<(0 if key=='seed' else 1):raise ValueError(f'Missing/invalid dataset selection {key}')
+        if not isinstance(config.get('dataset_path'),str) or not config['dataset_path'].strip():raise ValueError('Missing local held-out dataset source')
+        records,fingerprint=load_examples(SimpleNamespace(**config),max_hash_bytes=max_asset_hash_bytes)
+        if not isinstance(dataset,dict) or dataset.get('fingerprint')!=fingerprint:raise ValueError('Dataset content fingerprint differs')
+        if evaluation.get('sample_ids')!=[r['id'] for r in records]:raise ValueError('Selected evaluation IDs differ or are missing')
+        for key in ('max_input_tokens','max_new_tokens','prompt_template'):
+            if config.get(key)!=evaluation.get(key):raise ValueError(f'Requested/recorded evaluation setting differs: {key}')
+    except (OSError,ValueError,KeyError,TypeError,AttributeError) as exc:errors.append(f'Unverifiable dataset: {exc}')
     assets=docs['assets']; regions={k:v for k,v in assets.items() if k!='sha256'}
     if not _hash(assets.get('sha256')) or assets.get('sha256')!=canonical_hash(regions):errors.append('Invalid assets content identity')
     text=config.get('adapter')=='portable_awq_text' or evaluation.get('task')=='text'

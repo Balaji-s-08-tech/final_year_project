@@ -12,8 +12,10 @@ def normalize(answer: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", answer).casefold().split())
 
 
-def load_examples(config):
+def load_examples(config, *, max_hash_bytes=None):
     path = Path(config.dataset_path).resolve()
+    if max_hash_bytes is not None and file_hash(path,max_hash_bytes).get('status')!='HASHED':
+        raise ValueError('Dataset exceeds explicit verification budget or is unavailable')
     digest = hashlib.sha256()
     records, identifiers = [], set()
     with path.open("rb") as stream:
@@ -45,5 +47,10 @@ def load_examples(config):
         raise ValueError("Fewer examples than max_samples; refusing a silent sample-count change")
     chosen = random.Random(config.seed).sample(range(len(records)), config.max_samples)
     selected = [records[i] for i in chosen]
-    images = {r["id"]: file_hash(r["image"], max_bytes=None)["sha256"] for r in selected if r.get("image")}
+    images={}
+    for record in selected:
+        if record.get('image'):
+            evidence=file_hash(record['image'],max_hash_bytes)
+            if evidence.get('status')!='HASHED':raise ValueError('Selected image unavailable or exceeds verification budget')
+            images[record['id']]=evidence['sha256']
     return selected, canonical_hash({"jsonl_sha256": digest.hexdigest(), "selected_image_sha256": images})

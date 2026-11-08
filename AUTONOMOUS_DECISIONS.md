@@ -102,3 +102,6 @@ scientific credibility instead of claiming full-model success from unit tests.
 - Require literal explicit pickle trust at every supported public boundary. Safetensors is preferred; restricted tensor pickle still requires trust. Legacy unported binary training paths fail closed.
 - Deliberate compatibility change: migrate fixture calls and explicit CLI invocations to pass trust while retaining assertions. No grandfathered automatic consent.
 - Default checkpoint load budget is 64 MiB; trust and cheap declarative checks precede artifact reads/deserialization. Consent and hashes are not authentication or sandboxing.
+
+## Mission 13 cycle 6 — content-derived held-out provenance
+Dataset identity alone is insufficient. Verification now recomputes the evaluator's actual local data/image selection fingerprint and sample IDs, respecting the explicit hashing budget. Missing assets are NOT_VERIFIED, not assumed equal. Comparison fixtures were strengthened to generate real synthetic input evidence rather than dummy hashes; assertions were retained. This does not prove licensing, official split validity or semantic/pretraining disjointness. Validation: 392 CPU tests passed.

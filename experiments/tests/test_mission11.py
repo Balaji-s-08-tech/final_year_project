@@ -24,10 +24,15 @@ def pair(tmp_path,monkeypatch,status='COMPLETED'):
     write_json(asset_root/'config.json',{'model_type':'phi','hidden_size':16})
     digest=file_hash(asset_root/'weights',None)
     m={'identifier':'SYNTHETIC','architecture':'phi','revision':'v1','config_sha256':canonical_hash({'model_type':'phi','hidden_size':16}),'checkpoint_sha256':digest['sha256']}
-    d={'identifier':'SYNTHETIC_DATA','revision':'v1','fingerprint':'d'*64,'evaluation':{'split':'test','scorer':'exact_v1','prompt_template':'{question}','max_input_tokens':32,'max_new_tokens':2}}
+    data_path=tmp_path/'heldout.jsonl';data_path.write_text('{"id":"heldout","question":"fixture question","answers":["fixture answer"]}\n')
+    configuration={'seed':42,'adapter':'portable_awq_text','dataset_path':str(data_path),'max_samples':1,'max_input_tokens':32,'max_new_tokens':2,'prompt_template':'{question}'}
+    from types import SimpleNamespace
+    from evaluation.data import load_examples
+    records,fingerprint=load_examples(SimpleNamespace(**configuration))
+    d={'identifier':'SYNTHETIC_DATA','revision':'v1','fingerprint':fingerprint,'evaluation':{'sample_ids':[r['id'] for r in records],'split':'test','scorer':'exact_v1','prompt_template':'{question}','max_input_tokens':32,'max_new_tokens':2}}
     runs=[]
     for i in range(2):
-        r=ExperimentStore(tmp_path).create('audit',{'seed':42},model=m,dataset=d)
+        r=ExperimentStore(tmp_path).create('audit',configuration,model=m,dataset=d)
         if status=='COMPLETED':
             r.transition('RUNNING');r.transition(status,metrics=benchmark({'inference_latency':measurement('inference_latency',i+1,status='MEASURED',method='fixture')}))
         elif status in ('FAILED','CANCELLED'):r.transition(status,error='intentional fixture failure')
