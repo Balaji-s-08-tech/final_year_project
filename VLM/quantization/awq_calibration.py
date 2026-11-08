@@ -5,6 +5,8 @@ Keeping feature tensors on CPU bounds calibration memory on small GPUs.
 """
 
 from __future__ import annotations
+from experiments.store import read_json
+from experiments.jsonio import lines as bounded_lines
 from experiments.jsonio import loads as strict_json_loads
 
 import json
@@ -30,11 +32,11 @@ def load_calibration_text(source: str) -> List[str]:
             f"Calibration data must be a local .txt/.json/.jsonl file; not found: {source}"
         )
     if path.suffix.lower() == ".txt":
-        records: Iterable[object] = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+        records: Iterable[object] = [line.decode("utf-8",errors="strict").strip() for line in bounded_lines(path)]
     elif path.suffix.lower() == ".jsonl":
-        records = [strict_json_loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        records = [strict_json_loads(line) for line in bounded_lines(path) if line.strip()]
     elif path.suffix.lower() == ".json":
-        data = strict_json_loads(path.read_text(encoding="utf-8"))
+        data = read_json(path)
         records = data.get("data", data) if isinstance(data, dict) else data
         if not isinstance(records, list):
             raise ValueError("JSON calibration data must be a list or an object containing a 'data' list.")

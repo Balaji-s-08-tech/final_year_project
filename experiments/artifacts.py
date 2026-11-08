@@ -1,4 +1,5 @@
 """Validate artifact-bound JSON metadata without unpickling model objects."""
+from experiments.store import read_json
 from pathlib import Path
 import json
 import re
@@ -27,7 +28,7 @@ def inspect_artifact(path):
     if sidecar.stat().st_size > 1024 * 1024:
         raise ValueError("Artifact metadata exceeds the 1 MiB header limit")
     from experiments.jsonio import loads
-    metadata = loads(sidecar.read_text())
+    metadata = read_json(sidecar)
     if not isinstance(metadata, dict):
         raise ValueError("Artifact metadata must be an object")
     if type(metadata.get("schema_version")) is not int or metadata["schema_version"] != 1 or metadata.get("filename") != path.name:

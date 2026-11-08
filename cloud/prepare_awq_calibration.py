@@ -1,4 +1,5 @@
 from __future__ import annotations
+from experiments.store import read_json
 from experiments.jsonio import loads as strict_json_loads
 
 import argparse
@@ -20,7 +21,7 @@ def main() -> int:
     source = Path(args.source)
     if not source.is_file():
         raise FileNotFoundError(source)
-    records = strict_json_loads(source.read_text(encoding="utf-8"))
+    records = read_json(source)
     if not isinstance(records, list):
         raise ValueError("Bunny training JSON must be a list of conversation records")
 

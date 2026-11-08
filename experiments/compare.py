@@ -128,8 +128,12 @@ def compare(baseline, candidate, *, max_asset_hash_bytes=8*1024*1024):
     return report
 
 
-def compare_collection(baseline, candidates):
+def compare_collection(baseline, candidates, *, max_candidates=128):
     """Aggregate only admitted result pairs and disclose every excluded pair."""
+    from itertools import islice
+    if type(max_candidates)is not int or max_candidates<1:raise ValueError("Positive comparison budget required")
+    candidates=list(islice(candidates,max_candidates+1))
+    if len(candidates)>max_candidates:raise ValueError("Comparison exceeds candidate budget")
     accepted=[]; excluded=[]
     for candidate in candidates:
         report=compare(baseline,candidate)

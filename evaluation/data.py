@@ -18,31 +18,31 @@ def load_examples(config, *, max_hash_bytes=None):
         raise ValueError('Dataset exceeds explicit verification budget or is unavailable')
     digest = hashlib.sha256()
     records, identifiers = [], set()
-    with path.open("rb") as stream:
-        for line in stream:
-            digest.update(line)
-            if not line.strip():
-                continue
-            record = strict_json_loads(line)
-            if not isinstance(record, dict) or set(record) - {"id", "question", "answers", "image"}:
-                raise ValueError("Evaluation records must contain only id/question/answers/image")
-            if not isinstance(record.get("id"), str) or not record["id"] or record["id"] in identifiers:
-                raise ValueError("Example IDs must be nonempty and unique")
-            identifiers.add(record["id"])
-            if not isinstance(record.get("question"), str) or not record["question"].strip() or "<image>" in record["question"]:
-                raise ValueError("Question must be nonempty text without image sentinels")
-            if not isinstance(record.get("answers"), list) or not record["answers"] or not all(isinstance(a, str) and normalize(a) for a in record["answers"]):
-                raise ValueError("Every example requires nonempty reference answers")
-            if config.adapter == "bunny_phi":
-                if not isinstance(record.get("image"), str):
-                    raise ValueError("Multimodal examples require local images")
-                image = (path.parent / record["image"]).resolve()
-                if not image.is_relative_to(path.parent) or not image.is_file():
-                    raise ValueError("Image must exist within the dataset directory")
-                record["image"] = str(image)
-            elif record.get("image") is not None:
-                raise ValueError("Text-only adapter cannot silently discard images")
-            records.append(record)
+    from experiments.jsonio import lines
+    for line in lines(path):
+        digest.update(line)
+        if not line.strip():
+            continue
+        record = strict_json_loads(line)
+        if not isinstance(record, dict) or set(record) - {"id", "question", "answers", "image"}:
+            raise ValueError("Evaluation records must contain only id/question/answers/image")
+        if not isinstance(record.get("id"), str) or not record["id"] or record["id"] in identifiers:
+            raise ValueError("Example IDs must be nonempty and unique")
+        identifiers.add(record["id"])
+        if not isinstance(record.get("question"), str) or not record["question"].strip() or "<image>" in record["question"]:
+            raise ValueError("Question must be nonempty text without image sentinels")
+        if not isinstance(record.get("answers"), list) or not record["answers"] or not all(isinstance(a, str) and normalize(a) for a in record["answers"]):
+            raise ValueError("Every example requires nonempty reference answers")
+        if config.adapter == "bunny_phi":
+            if not isinstance(record.get("image"), str):
+                raise ValueError("Multimodal examples require local images")
+            image = (path.parent / record["image"]).resolve()
+            if not image.is_relative_to(path.parent) or not image.is_file():
+                raise ValueError("Image must exist within the dataset directory")
+            record["image"] = str(image)
+        elif record.get("image") is not None:
+            raise ValueError("Text-only adapter cannot silently discard images")
+        records.append(record)
     if len(records) < config.max_samples:
         raise ValueError("Fewer examples than max_samples; refusing a silent sample-count change")
     chosen = random.Random(config.seed).sample(range(len(records)), config.max_samples)

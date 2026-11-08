@@ -23,6 +23,8 @@ from experiments.schema import validate_benchmark
 logging.basicConfig(level=os.environ.get("VLM_LOG_LEVEL", "INFO"))
 app = FastAPI(title="VLM Compression Research API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=[FRONTEND_ORIGIN], allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
+from backend.admission import RequestAdmission
+app.add_middleware(RequestAdmission)
 jobs = JobManager()
 IMPORTED_RESULTS_ROOT = OUTPUT_ROOT / "imported_results"
 
@@ -62,7 +64,7 @@ def _torch_version():
 @app.get("/api/models")
 def models():
     checkpoints = list_checkpoints()
-    return [{"id": "bunny-v1_0-3b-phi2", "name": "Bunny-v1.0-3B", "family": "Bunny LVLM", "backbone": "Phi-2", "architecture_importable": _bunny_importable(), "registered_checkpoints": checkpoints, "capabilities": {"pruning": {"available": False, "status": "not exposed by dashboard job runner; run the audited local script manually after checking resources"}, "recovery": {"available": False, "status": "requires explicit trained checkpoint; no cloud worker configured"}, "awq_quantization": {"available": True, "precisions": [4, 8], "engine": "portable PyTorch dequantization fallback"}, "text_inference": {"available": any(item["format"] == "portable_awq" for item in checkpoints)}, "image_inference": {"available": False, "reason": "Registered portable AWQ checkpoints contain the Phi-2 language backbone, not the full Bunny vision encoder/projector."}}}]
+    return [{"id": "bunny-v1_0-3b-phi2", "name": "Bunny-v1.0-3B", "family": "Bunny LVLM", "backbone": "Phi-2", "architecture_importable": _bunny_importable(), "registered_checkpoints": checkpoints, "capabilities": {"pruning": {"available": False, "status": "not exposed by dashboard job runner; historical scripts are quarantined; use the CPU-validated compression.pruning library"}, "recovery": {"available": False, "status": "requires explicit trained checkpoint; no cloud worker configured"}, "awq_quantization": {"available": True, "precisions": [4, 8], "engine": "portable PyTorch dequantization fallback"}, "text_inference": {"available": any(item["format"] == "portable_awq" for item in checkpoints)}, "image_inference": {"available": False, "reason": "Registered portable AWQ checkpoints contain the Phi-2 language backbone, not the full Bunny vision encoder/projector."}}}]
 
 
 def _bunny_importable():
@@ -257,4 +259,4 @@ def experiment_history():
 
 @app.get("/api/pipeline/capabilities")
 def pipeline_capabilities():
-    return {"operations": {"pruning": {"status": "not_exposed", "command": "LLM-Pruner/examples/Bunny.py", "reason": "Pruning needs a resource-checked manual run; no API worker is configured for it."}, "recovery": {"status": "unavailable", "reason": "No recovery worker is configured; full recovery training is not started by this API."}, "quantize": {"status": "available", "bits": [4, 8]}, "benchmark": {"status": "available", "metrics": ["artifact size"], "other_metrics": "NOT MEASURED"}, "text_inference": {"status": "available_for_portable_awq_checkpoint", "device": "CPU"}, "image_inference": {"status": "unavailable", "reason": "The portable quantized checkpoint is language-only."}}}
+    return {"operations": {"pruning": {"status": "not_exposed", "command": None, "reason": "Historical scripts are quarantined; compression.pruning is a CPU-validated library, not an API worker."}, "recovery": {"status": "unavailable", "reason": "No recovery worker is configured; full recovery training is not started by this API."}, "quantize": {"status": "available", "bits": [4, 8]}, "benchmark": {"status": "available", "metrics": ["artifact size"], "other_metrics": "NOT MEASURED"}, "text_inference": {"status": "available_for_portable_awq_checkpoint", "device": "CPU"}, "image_inference": {"status": "unavailable", "reason": "The portable quantized checkpoint is language-only."}}}

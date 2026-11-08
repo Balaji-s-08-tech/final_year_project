@@ -44,12 +44,14 @@ def write_json(path, value):
     from experiments.jsonio import validate
     validate(value)
     payload = json.dumps(value, indent=2, sort_keys=True, allow_nan=False).encode()
+    from experiments.jsonio import DEFAULT_LIMITS
+    if len(payload)>DEFAULT_LIMITS.max_bytes:raise ValueError("Serialized JSON exceeds byte budget")
     publish(path, lambda stream: stream.write(payload))
 
 
-def read_json(path):
-    from experiments.jsonio import loads
-    return loads(Path(path).read_text())
+def read_json(path, *, limits=None):
+    from experiments.jsonio import read,DEFAULT_LIMITS
+    return read(path,limits=DEFAULT_LIMITS if limits is None else limits)
 
 
 class Run:
@@ -63,7 +65,8 @@ class Run:
             yield
 
     def latest(self):
-        revisions = sorted(self.path.glob("state_*.json"))
+        from experiments.jsonio import files
+        revisions = sorted(files(self.path, "state_*.json"))
         if not revisions:
             raise ValueError("Incomplete experiment initialization")
         return read_json(revisions[-1])
@@ -159,6 +162,13 @@ class ExperimentStore:
             os.close(parent)
         return Run(destination)
 
-    def runs(self):
-        return [Run(path.parent) for path in sorted(self.root.rglob("experiment.json"))
-                if not any(part.startswith(".") for part in path.relative_to(self.root).parts)]
+    def runs(self, *, max_records=1000, max_entries=10000):
+        from experiments.jsonio import files
+        if type(max_records) is not int or max_records < 1:
+            raise ValueError("Positive history record budget required")
+        paths = []
+        for path in files(self.root, "experiment.json", max_entries=max_entries):
+            paths.append(path)
+            if len(paths) > max_records:
+                raise ValueError("History exceeds record budget; select a smaller store or explicit reviewed limit")
+        return [Run(path.parent) for path in sorted(paths)]
