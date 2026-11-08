@@ -13,6 +13,9 @@ Flow (see LLMPruner/models/hf_phi3/fusion.py for the rationale):
        matching Bunny.py / llava-vicuna_prune.py and consumed by the InternVL
        recovery loader at ``VLM/InternVL/internvl_chat/internvl/model/internvl_chat/builder.py``.
 """
+
+raise RuntimeError("Unsupported historical workflow: quarantined before imports or model acquisition. Use the audited evaluation/compression entry points; no training, download or remote-code execution is authorized here.")
+
 import os
 import gc
 import sys

@@ -42,4 +42,3 @@ def test_history_collection_budget(tmp_path):
     for i in range(1001):
         p=tmp_path/'name'/str(i)/'experiment.json';p.parent.mkdir(parents=True);p.write_text('{}')
     with pytest.raises(ValueError,match='budget|limit'):ExperimentStore(tmp_path).runs()
-

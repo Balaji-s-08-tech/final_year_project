@@ -2,6 +2,9 @@
 Refer to
 https://github.com/tloen/alpaca-lora/blob/main/finetune.py
 '''
+
+raise RuntimeError("Unsupported historical workflow: quarantined before imports or model acquisition. Use the audited evaluation/compression entry points; no training, download or remote-code execution is authorized here.")
+
 import checkpoint_io
 
 import os
