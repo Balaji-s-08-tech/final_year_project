@@ -16,7 +16,7 @@ dense baseline pilot, after billing, assets and task protocol are resolved.
 | 4 scoped pruning | feat/mission-4-pruning-framework | 96de78367184f2f90a87e47dfa7d187aa8c705c1 | 259 tests |
 | 5 AWQ verification | feat/mission-5-awq-validation | cf40401e8c59e37b32a3b23831e6b9940cb9865c | 264 tests |
 | 6 bounded pipeline | feat/mission-6-compression-pipeline | 77e79b4f55b38f469014f28e672663726fec0fe1 | 271 tests |
-| 7 package and final offline guards | docs/mission-7-research-package | See branch tip / progress ledger | 276 tests |
+| 7 package and final offline guards | docs/mission-7-research-package | 528fb3895e70f0f4fc88f4cdb620bb015722a419 | 276 tests |
 
 All branch URLs use https://github.com/Balaji-s-08-tech/final_year_project/tree/ followed
 by the branch name. Ancestry starts at a1b3272, preserving all original milestones.
