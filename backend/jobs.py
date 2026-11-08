@@ -35,25 +35,27 @@ class JobManager:
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="vlm-job")
         self.store = ExperimentStore(experiment_root or OUTPUT_ROOT / "experiments", PROJECT_ROOT)
         self._runs = {}
+        self.invalid_runs=[]
         for run in self.store.runs():
-            state = run.latest()
-            if "job" not in state:
-                continue
-            record = JobRecord.model_validate(state["job"])
-            self._runs[record.id] = run
-            self._jobs[record.id] = record
-            self._cancel_events[record.id] = threading.Event()
-            if state["status"] in {"QUEUED", "RUNNING"}:
-                pid = read_json(run.path / "experiment.json")["owner_pid"]
-                try:
-                    os.kill(pid, 0)
-                except ProcessLookupError:
-                    record.status = "failed"
-                    record.error = "Backend owner exited; interrupted jobs are not resumed automatically"
-                    record.finished_at = _now()
-                    run.transition("FAILED", job=record.model_dump(mode="json"), error=record.error)
-                except PermissionError:
-                    pass  # An inaccessible owner is not evidence that it exited.
+            try:
+                state=run.latest()
+                if not isinstance(state,dict):raise ValueError('Invalid lifecycle object')
+                if 'job' not in state:continue
+                record=JobRecord.model_validate(state['job'])
+                if record.id!=state.get('run_id'):raise ValueError('Job/run identity mismatch')
+                if state['status'] in {'QUEUED','RUNNING'}:
+                    pid=read_json(run.path/'experiment.json')['owner_pid']
+                    if type(pid)is not int or pid<1:raise ValueError('Invalid backend owner PID')
+                    try:os.kill(pid,0)
+                    except ProcessLookupError:
+                        record.status='failed';record.error='Backend owner exited; interrupted jobs are not resumed automatically';record.finished_at=_now()
+                        run.transition('FAILED',job=record.model_dump(mode='json'),error=record.error)
+                    except PermissionError:pass
+                self._runs[record.id]=run;self._jobs[record.id]=record
+                self._cancel_events[record.id]=threading.Event()
+            except (OSError,ValueError,TypeError,KeyError) as exc:
+                self.invalid_runs.append({'path':str(run.path),'error':str(exc)})
+                logger.warning('Excluded invalid persisted backend record %s: %s',run.path,exc)
 
     def list(self) -> list[JobRecord]:
         with self._lock:

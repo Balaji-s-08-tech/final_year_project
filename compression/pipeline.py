@@ -53,6 +53,8 @@ class TextPredictor:
         if ids.shape[1]>self.max_input_tokens: raise ValueError('Input exceeds configured bound')
         settings=GenerationConfig.from_dict(model.generation_config.to_dict())
         settings.update(max_new_tokens=self.max_new_tokens,do_sample=False,num_beams=1,use_cache=True,pad_token_id=self.tokenizer.pad_token_id)
+        from evaluation.inference_policy import validate_generation
+        validate_generation(settings.to_dict())
         self.effective_config=settings.to_dict()
         with torch.inference_mode():
             output=model.generate(input_ids=ids,attention_mask=encoded.get('attention_mask',torch.ones_like(ids)),

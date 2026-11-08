@@ -111,6 +111,10 @@ def assess(path, max_asset_hash_bytes=8*1024*1024):
         if type(generation.get(key)) is not bool:errors.append(f'Invalid generation.{key}')
     for key in ('pad_token_id','eos_token_id'):
         if key not in generation or (generation[key] is not None and not (type(generation[key]) is int and generation[key]>=0) and not (key=='eos_token_id' and isinstance(generation[key],list) and generation[key] and all(type(v)is int and v>=0 for v in generation[key]))):errors.append(f'Invalid generation.{key}')
+    try:
+        from evaluation.inference_policy import validate_generation
+        validate_generation(generation)
+    except (ValueError,TypeError) as exc:errors.append(f'Invalid effective generation policy: {exc}')
     if generation.get('max_new_tokens')!=evaluation.get('max_new_tokens'):errors.append('Requested/effective generation limit conflict')
     tokenizer=effective.get('tokenizer')
     if not isinstance(tokenizer,dict) or not all(isinstance(tokenizer.get(k),str) and tokenizer[k].strip() for k in ('class','name')):errors.append('Missing effective tokenizer identity')

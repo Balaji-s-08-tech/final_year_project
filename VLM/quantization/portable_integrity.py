@@ -28,6 +28,12 @@ def validate_architecture(document):
         if not isinstance(norm,dict) or type(norm.get('enabled')) is not bool:raise ValueError('Missing/invalid qk_layernorm normalization declaration')
         requested=config.get('qk_layernorm',False)
         if type(requested)is not bool or norm['enabled']!=requested:raise ValueError('qk_layernorm configuration conflict')
+        if requested:
+            epsilon=config.get('layer_norm_eps')
+            import math
+            if type(epsilon)not in (int,float) or not math.isfinite(epsilon) or epsilon<=0:raise ValueError('Invalid qk normalization epsilon')
+            if any(type(norm.get(k))not in (int,float) for k in ('query_eps','key_eps')):raise ValueError('Invalid qk normalization epsilon type')
+            if norm.get('query_eps')!=epsilon or norm.get('key_eps')!=epsilon:raise ValueError('qk normalization epsilon conflicts with config')
         expected_shape=[h] if requested else None
         if norm.get('query_shape')!=expected_shape or norm.get('key_shape')!=expected_shape:raise ValueError('Unsupported query/key normalization dimensions')
         if not fixture:
@@ -60,7 +66,8 @@ def describe(model):
                 if shape!=[block.mlp.fc1.in_features] or (norm.weight is not None and list(norm.weight.shape)!=shape) or (norm.bias is not None and list(norm.bias.shape)!=shape):raise ValueError('Unsupported query/key normalization dimensions')
                 shapes.append(shape)
             else:shapes.append(None)
-        descriptor={'qk_normalization':{'enabled':enabled,'query_shape':shapes[0],'key_shape':shapes[1]},'hidden':block.mlp.fc1.in_features,'intermediate':block.mlp.fc1.out_features,'linears':linears}
+        eps=[getattr(getattr(block.self_attn,n,None),'eps',None) if enabled else None for n in ('q_layernorm','k_layernorm')]
+        descriptor={'qk_normalization':{'enabled':enabled,'query_shape':shapes[0],'key_shape':shapes[1],'query_eps':eps[0],'key_eps':eps[1]},'hidden':block.mlp.fc1.in_features,'intermediate':block.mlp.fc1.out_features,'linears':linears}
         if config.get('model_type')!='tiny-phi2':
             attention=block.self_attn
             for name,expected in [('hidden_size',config['hidden_size']),('num_key_value_heads',config.get('num_key_value_heads',config['num_attention_heads'])),('num_key_value_groups',1)]:

@@ -96,6 +96,8 @@ class LocalAdapter:
         from transformers import GenerationConfig
         self.generation_settings = GenerationConfig.from_dict(self.model.generation_config.to_dict())
         self.generation_settings.update(max_new_tokens=self.config.max_new_tokens, do_sample=False, num_beams=1, use_cache=True, pad_token_id=self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id)
+        from evaluation.inference_policy import validate_generation
+        validate_generation(self.generation_settings.to_dict())
         return {"asset_verification": self.asset_verification, "weight_origin": self.weight_origin, "pretrained_identity": "UNVERIFIED; local loading coverage is not acquisition provenance", "generation": self.generation_settings.to_dict(), "model": self.model.config.to_dict(), "tokenizer": {"class": type(self.tokenizer).__name__, "name": self.tokenizer.name_or_path}, "processor": self.processor.to_dict() if hasattr(self, "processor") else None}
 
     def inspect(self):

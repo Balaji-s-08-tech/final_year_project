@@ -107,7 +107,8 @@ def compare(baseline, candidate, *, max_asset_hash_bytes=8*1024*1024):
     measured=[]
     for e in evidence:
         metrics=e['state'].get('metrics',{}).get('metrics',{}) if isinstance(e['state'].get('metrics',{}),dict) else {}
-        measured.append({k:v for k,v in metrics.items() if isinstance(v,dict) and v.get('status')=='MEASURED'})
+        if not isinstance(metrics,dict) or e['exclusions']:metrics={}
+        measured.append({k:v for k,v in metrics.items() if k in UNITS and isinstance(v,dict) and v.get('status')=='MEASURED'})
     common=[k for k in measured[0].keys() & measured[1].keys() if measured[0][k].get('unit')==measured[1][k].get('unit') and measured[0][k].get('method')==measured[1][k].get('method')]
     if not common:
         exclusions.append({'path':str(candidate),'reasons':['No common valid measured metric with matching units/method']})

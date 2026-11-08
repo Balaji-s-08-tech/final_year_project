@@ -6,7 +6,12 @@ def validate_state(model):
     for name,tensor in model.state_dict().items():
         if (tensor.is_floating_point() or tensor.is_complex()) and not torch.isfinite(tensor).all():
             raise ValueError(f'Nonfinite checkpoint state: {name}')
+    import math
     for name,module in model.named_modules():
+        if isinstance(module,torch.nn.LayerNorm):
+            if type(module.eps)not in (float,int) or not math.isfinite(module.eps) or module.eps<=0:raise ValueError(f'Invalid LayerNorm normalization epsilon: {name}')
+            if not module.normalized_shape or any(type(v)is not int or v<1 for v in module.normalized_shape):raise ValueError(f'Invalid LayerNorm normalization shape: {name}')
+            if any(p is not None and tuple(p.shape)!=tuple(module.normalized_shape) for p in (module.weight,module.bias)):raise ValueError(f'LayerNorm normalization tensor mismatch: {name}')
         if isinstance(module,torch.nn.Linear):
             if module.weight.shape != (module.out_features,module.in_features) or (module.bias is not None and module.bias.shape != (module.out_features,)):
                 raise ValueError(f'Checkpoint linear shape mismatch: {name}')

@@ -147,6 +147,7 @@ def create_inference(request: JobRequest):
 def benchmark_results():
     from experiments.store import read_json
     manifests = []
+    invalid=[]
     for path in (PROJECT_ROOT / "checkpoints").rglob("benchmark_manifest.json"):
         try:
             payload = read_json(path)
@@ -169,12 +170,15 @@ def benchmark_results():
             continue
     from experiments.store import read_json
     for run in ExperimentStore(PROJECT_ROOT / "checkpoints" / "experiments", PROJECT_ROOT).runs():
-        state = run.latest()
-        if state["status"] == "COMPLETED" and "metrics" in state:
-            manifests.append({"path": str(run.path), "origin": "local_experiment", "imported_at": None,
-                "source_label": state["run_id"], "metadata": read_json(run.path / "experiment.json"),
-                "results": {"experiment": {"precision": "UNKNOWN", "benchmark": state["metrics"]}}})
-    valid=[]; invalid=[]; measured=False
+        try:
+            state = run.latest()
+            if state["status"] == "COMPLETED" and "metrics" in state:
+                manifests.append({"path": str(run.path), "origin": "local_experiment", "imported_at": None,
+                    "source_label": state["run_id"], "metadata": read_json(run.path / "experiment.json"),
+                    "results": {"experiment": {"precision": "UNKNOWN", "benchmark": state["metrics"]}}})
+        except (OSError,ValueError,TypeError,KeyError) as exc:
+            invalid.append({'path':str(run.path),'error':str(exc)})
+    valid=[]; measured=False
     for item in manifests:
         try:
             measured = _has_numeric_measurement(item['results']) or measured
@@ -240,8 +244,15 @@ def import_results(request: ImportResultsRequest):
 @app.get("/api/experiments")
 def experiment_history():
     from experiments.store import read_json
-    return [{"path": str(run.path), "experiment": read_json(run.path / "experiment.json"), "state": run.latest()}
-            for run in ExperimentStore(OUTPUT_ROOT / "experiments", PROJECT_ROOT).runs()]
+    rows=[]
+    for run in ExperimentStore(OUTPUT_ROOT/'experiments',PROJECT_ROOT).runs():
+        try:
+            identity=read_json(run.path/'experiment.json');state=run.latest()
+            if not isinstance(identity,dict) or not isinstance(state,dict):raise ValueError('Invalid experiment/history object')
+            rows.append({'path':str(run.path),'experiment':identity,'state':state})
+        except (OSError,ValueError,TypeError,KeyError) as exc:
+            rows.append({'path':str(run.path),'experiment':None,'state':{'status':'INVALID','error':str(exc)}})
+    return rows
 
 
 @app.get("/api/pipeline/capabilities")

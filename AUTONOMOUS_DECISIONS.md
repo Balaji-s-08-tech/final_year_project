@@ -105,3 +105,10 @@ scientific credibility instead of claiming full-model success from unit tests.
 
 ## Mission 13 cycle 6 — content-derived held-out provenance
 Dataset identity alone is insufficient. Verification now recomputes the evaluator's actual local data/image selection fingerprint and sample IDs, respecting the explicit hashing budget. Missing assets are NOT_VERIFIED, not assumed equal. Comparison fixtures were strengthened to generate real synthetic input evidence rather than dummy hashes; assertions were retained. This does not prove licensing, official split validity or semantic/pretraining disjointness. Validation: 392 CPU tests passed.
+
+## Mission 13 cycles 7–8 — persistence isolation and effective policy
+- Invalid persisted rows are explicit diagnostics rather than service-wide exceptions. Invalid owner IDs are rejected before process liveness inspection; automatic job resume remains unsupported.
+- Validate effective generation semantics using the implemented greedy, single-continuation protocol at both execution and comparison boundaries. Unknown or invalid material fields are rejected, not silently defaulted into evidence.
+- LayerNorm tensor shape and epsilon are model-compatibility inputs. Q/k normalization flags, shape and epsilon must agree with the vendored forward and config; unsupported variants fail admission.
+- Completed malformed metric schemas cannot be processed again by coverage reporting; invalid rows retain exclusions.
+- Stop at eight cycles with a clean committed handoff. Known unsupported legacy acquisition/dynamic-code workflows and external assets/GPU validation remain review work; do not claim repository-wide security or research readiness.
