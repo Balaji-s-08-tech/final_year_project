@@ -32,6 +32,7 @@ export interface Checkpoint {
   path: string;
   format: string;
   precision: string;
+  checkpoint_sha256: string | null;
   size_bytes: number;
   parameters: number | null;
   lineage: string;

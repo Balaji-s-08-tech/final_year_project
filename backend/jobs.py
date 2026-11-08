@@ -75,6 +75,8 @@ class JobManager:
         if operation == "inference" and payload.get("image"):
             raise ValueError("The registered AWQ checkpoints are language-only; image inference is not supported.")
         checkpoint = get_checkpoint(payload["checkpoint_id"])
+        if operation in {"inference", "quantize"}:
+            self._check_consent(payload, checkpoint)
         if operation == "quantize":
             if not payload.get("calibration_id"):
                 raise ValueError("AWQ quantization requires a registered local calibration text file.")
@@ -111,6 +113,12 @@ class JobManager:
             self._cancel_events[record.id] = threading.Event()
         self._pool.submit(self._run, record.id)
         return record.model_copy(deep=True)
+
+    @staticmethod
+    def _check_consent(request, checkpoint):
+        from checkpoint_io import require_trusted, verify_identity
+        require_trusted(request.get('trusted_checkpoint',False))
+        verify_identity(checkpoint['path'],request.get('checkpoint_sha256'))
 
     def cancel(self, job_id: str) -> JobRecord:
         with self._lock:
@@ -223,6 +231,8 @@ class JobManager:
     def _execute(self, job_id: str, request: dict, cancel_event: threading.Event, log, set_process) -> dict:
         checkpoint = get_checkpoint(request["checkpoint_id"])
         path = resolve_approved_path(checkpoint["path"])
+        if request["operation"] in {"inference", "quantize"}:
+            self._check_consent(request, checkpoint)
         if request["operation"] == "inference":
             return self._infer(job_id, path, request, cancel_event)
         run = self._runs[job_id]
@@ -238,7 +248,7 @@ class JobManager:
         else:
             raise ValueError("Unsupported job operation.")
         if request["operation"]=="quantize" and request.get("trusted_checkpoint") is True:
-            command.append("--trust-local-checkpoint")
+            command += ["--trust-local-checkpoint", "--expected-source-sha256", request["checkpoint_sha256"]]
         command += ["--experiment-dir", str(run.path)]
         # Keep raw stdout/stderr distinct and durable, while forwarding stdout
         # to structured API logs. stderr stays available even if the worker dies.
@@ -268,11 +278,30 @@ class JobManager:
             raise RuntimeError("Cancelled")
         from VLM.quantization.awq_model_loader import load_quantized_bunny_checkpoint
         import torch
-        tokenizer, model, metadata = load_quantized_bunny_checkpoint(str(path), device="cpu", trusted=request.get("trusted_checkpoint",False))
-        encoded = tokenizer(request["prompt"], return_tensors="pt", truncation=True, max_length=2048)
+        tokenizer, model, metadata = load_quantized_bunny_checkpoint(str(path), device="cpu", trusted=request.get("trusted_checkpoint",False), expected_sha256=request.get("checkpoint_sha256"))
+        maximum=request['max_new_tokens']
+        if type(maximum)is not int or not 1<=maximum<=128:
+            raise ValueError('Invalid generation token limit')
+        prompt=request.get('prompt')
+        if not isinstance(prompt,str) or not prompt.strip() or len(prompt)>4096:
+            raise ValueError('A bounded nonempty text prompt is required')
+        encoded = tokenizer(prompt, return_tensors="pt", truncation=False, return_token_type_ids=False)
+        length=encoded['input_ids'].shape[-1]
+        context=getattr(model.config,'max_position_embeddings',None)
+        if length<1 or length>2048 or (context is not None and length+maximum>context):
+            raise ValueError('Prompt token/context limit exceeded; implicit truncation is forbidden')
+        from transformers import GenerationConfig
+        from evaluation.inference_policy import validate_generation
+        settings=GenerationConfig.from_dict(model.generation_config.to_dict())
+        settings.update(max_new_tokens=maximum,do_sample=False,num_beams=1,use_cache=True,
+            pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id)
+        validate_generation(settings.to_dict())
         started = time.perf_counter()
         with torch.inference_mode():
-            output = model.generate(**encoded, max_new_tokens=request["max_new_tokens"], do_sample=False)
+            output = model.generate(**encoded, generation_config=settings)
         elapsed = time.perf_counter() - started
+        if not torch.is_tensor(output) or output.ndim!=2 or output.shape[0]!=1 or output.shape[1]<length or output.dtype not in (torch.int32,torch.int64):
+            raise ValueError('Invalid generated token output')
         text = tokenizer.decode(output[0], skip_special_tokens=True)
-        return {"text": text, "latency_seconds": elapsed, "max_new_tokens": request["max_new_tokens"], "modality": "text-only", "metadata": metadata}
+        return {"text": text, "latency_seconds": elapsed, "max_new_tokens": maximum, "modality": "text-only", "metadata": metadata,
+            "original_input_tokens":length,"effective_input_tokens":length,"truncated":False,"effective_generation":settings.to_dict()}

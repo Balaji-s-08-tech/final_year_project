@@ -202,7 +202,7 @@ def load_artifact(run_path,*,trusted=False,max_load_bytes=64*1024*1024):
     manifest=read_json(root/'artifact_manifest.json')
     if trusted is not True or path.stat().st_size>max_load_bytes: raise ValueError('Trusted bounded CPU artifact required')
     if file_hash(path,None)['sha256']!=manifest['sha256']: raise ValueError('Artifact content mismatch')
-    _enable_project_imports(); payload=_torch_load(path,trusted=trusted,max_load_bytes=max_load_bytes)
+    _enable_project_imports(); payload=_torch_load(path,trusted=trusted,max_load_bytes=max_load_bytes,expected_sha256=manifest["sha256"])
     if payload.get('format')!='vlm-compression-v1': raise ValueError('Unknown pipeline artifact')
     admit_model(payload['model'])
     from evaluation.integrity import validate_packed

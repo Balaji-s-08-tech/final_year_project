@@ -29,12 +29,19 @@ def _identifier(path: Path) -> str:
 def list_checkpoints() -> list[dict]:
     supported = {".bin", ".pt", ".pth", ".safetensors"}
     records = []
+    from experiments.jsonio import files
+    from experiments.provenance import file_hash
+    hash_bytes = 0
     for root in approved_roots():
-        for path in root.rglob("*"):
+        for path in files(root,"*"):
             if not path.is_file() or path.suffix.lower() not in supported:
                 continue
             lowered = path.name.lower()
+            size=path.stat().st_size
+            can_hash=size<=64*1024*1024 and hash_bytes+size<=256*1024*1024
+            hash_bytes+=size if can_hash else 0
             try:
+                if not can_hash:raise ValueError("Checkpoint listing byte budget exhausted")
                 metadata = inspect_artifact(path)
             except (OSError, ValueError):
                 metadata = {"precision": "UNKNOWN", "format": None}
@@ -47,13 +54,13 @@ def list_checkpoints() -> list[dict]:
                 "path": str(path),
                 "format": fmt,
                 "precision": precision,
-                "checkpoint_sha256": metadata.get("sha256"),
+                "checkpoint_sha256": file_hash(path,64*1024*1024).get("sha256") if can_hash else None,
                 "quantization": metadata.get("quantization"),
                 "size_bytes": path.stat().st_size,
                 "parameters": None,
                 "lineage": "AWQ output" if awq else "Serialized model checkpoint; inspect metadata before interpreting as recovered",
                 "multimodal": False,
-                "available": True,
+                "available": can_hash,
             })
     return sorted(records, key=lambda record: (record["name"], record["path"]))
 
@@ -67,8 +74,9 @@ def get_checkpoint(checkpoint_id: str) -> dict:
 
 def list_calibration_files() -> list[dict]:
     records = []
+    from experiments.jsonio import files
     for root in approved_roots():
-        for path in root.rglob("*.txt"):
+        for path in files(root,"*.txt"):
             if path.is_file() and path.stat().st_size <= 20 * 1024 * 1024:
                 records.append({"id": _identifier(path), "name": path.name, "path": str(path), "size_bytes": path.stat().st_size})
     return sorted(records, key=lambda record: record["path"])

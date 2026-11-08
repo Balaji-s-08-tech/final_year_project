@@ -14,7 +14,8 @@ class JobRequest(BaseModel):
     prompt: Optional[str] = Field(default=None, max_length=4096)
     image: Optional[str] = None
     trusted_checkpoint: bool = Field(default=False, strict=True)
-    max_new_tokens: int = Field(default=64, ge=1, le=128)
+    checkpoint_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    max_new_tokens: int = Field(default=64, strict=True, ge=1, le=128)
 
     @model_validator(mode="after")
     def validate_inference_request(self):

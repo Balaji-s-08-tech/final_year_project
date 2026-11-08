@@ -21,9 +21,9 @@ def _enable_project_imports() -> None:
             sys.path.insert(0, string_path)
 
 
-def _torch_load(path: Path, *, trusted=False, max_load_bytes=64*1024*1024):
+def _torch_load(path: Path, *, trusted=False, max_load_bytes=64*1024*1024, expected_sha256=None):
     from checkpoint_io import load_pickle
-    return load_pickle(path, trusted=trusted, max_load_bytes=max_load_bytes)
+    return load_pickle(path, trusted=trusted, max_load_bytes=max_load_bytes, expected_sha256=expected_sha256)
 
 
 def _load_recovery_state(model, recovery_checkpoint: Path, *, trusted=False) -> None:
@@ -59,6 +59,7 @@ def load_bunny_recovered_model(
     device: str = "cpu",
     authorize_gpu: bool = False,
     trusted: bool = False,
+    expected_source_sha256: str | None = None,
 ) -> Tuple[object, torch.nn.Module, dict]:
     """Load the *structured-pruned + recovered* Bunny Phi-2 model.
 
@@ -76,7 +77,7 @@ def load_bunny_recovered_model(
         raise FileNotFoundError(f"Explicit recovery checkpoint is unavailable: {recovery_checkpoint}")
     selected = Path(recovery_checkpoint or pruned_checkpoint or "")
     if selected.is_file():
-        payload = _torch_load(selected, trusted=trusted)
+        payload = _torch_load(selected, trusted=trusted, expected_sha256=expected_source_sha256)
         if isinstance(payload, dict) and "model" in payload and hasattr(payload["model"], "state_dict"):
             model = payload["model"]
             tokenizer = payload.get("tokenizer")
@@ -121,7 +122,7 @@ def load_bunny_recovered_model(
     }
 
 
-def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize_gpu=False, trusted=False, max_load_bytes=64*1024*1024):
+def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize_gpu=False, trusted=False, max_load_bytes=64*1024*1024, expected_sha256=None):
     """Load a portable AWQ output made by :mod:`awq_quantize`."""
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
@@ -131,8 +132,12 @@ def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize
     from checkpoint_io import admit_size
     admit_size(path,max_load_bytes)
     admission = header(path,max_hash_bytes=max_load_bytes)  # Validate dimensions/precision before pickle constructs modules.
+    if expected_sha256 is not None:
+        from checkpoint_io import validate_digest
+        validate_digest(expected_sha256)
+        if admission.get("sha256")!=expected_sha256:raise ValueError("Checkpoint identity changed since selection")
     _enable_project_imports()
-    payload = _torch_load(Path(path), trusted=trusted,max_load_bytes=max_load_bytes)
+    payload = _torch_load(Path(path), trusted=trusted,max_load_bytes=max_load_bytes,expected_sha256=admission["sha256"])
     reconcile(payload, admission)
     if not isinstance(payload, dict) or payload.get("format") != "bunny-awq-portable-v1":
         raise ValueError("Not a Bunny portable AWQ checkpoint.")
