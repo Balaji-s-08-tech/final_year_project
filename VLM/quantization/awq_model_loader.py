@@ -126,7 +126,11 @@ def load_quantized_bunny_checkpoint(path: str, device: str = "cpu", *, authorize
     """Load a portable AWQ output made by :mod:`awq_quantize`."""
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from VLM.quantization.portable_integrity import header, reconcile
+    admission = header(path)  # Validate dimensions/precision before pickle constructs modules.
+    _enable_project_imports()
     payload = _torch_load(Path(path))
+    reconcile(payload, admission)
     if not isinstance(payload, dict) or payload.get("format") != "bunny-awq-portable-v1":
         raise ValueError("Not a Bunny portable AWQ checkpoint.")
     from evaluation.integrity import validate_packed, guard_logits

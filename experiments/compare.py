@@ -13,7 +13,7 @@ def differences(left, right, prefix=""):
     return {} if left == right else {prefix: {"baseline": left, "candidate": right}}
 
 
-def compare(baseline, candidate):
+def _diagnostic_compare(baseline, candidate):
     a, b = Run(baseline), Run(candidate)
     identities = [read_json(run.path / "experiment.json") for run in (a, b)]
     configs = [read_json(run.path / "config.json") for run in (a, b)]
@@ -80,5 +80,43 @@ def csv_report(report):
     writer = csv.writer(stream)
     writer.writerow(["baseline_run", "candidate_run", "metric", "difference", "unit", "status", "warnings"])
     for name, delta in report["deltas"].items():
-        writer.writerow([report["baseline_run"], report["candidate_run"], name, delta["difference"], delta["unit"], delta["status"], "; ".join(report["warnings"])])
+        writer.writerow([report["baseline_run"], report["candidate_run"], name, delta["difference"], delta["unit"], delta["status"], "; ".join(report["warnings"] + report.get("evidence_errors", []) + [str(e) for e in report.get("exclusions", [])])])
     return stream.getvalue()
+
+
+def compare(baseline, candidate, *, max_asset_hash_bytes=8*1024*1024):
+    """Validate evidence and lifecycle at the public comparison boundary."""
+    from experiments.evidence import assess
+    if max_asset_hash_bytes is not None and (type(max_asset_hash_bytes)is not int or max_asset_hash_bytes<1):raise ValueError('Positive hash budget or explicit None required')
+    evidence=[assess(p,max_asset_hash_bytes) for p in (baseline,candidate)]
+    exclusions=[{'path':str(p),'reasons':e['exclusions']} for p,e in zip((baseline,candidate),evidence) if e['exclusions']]
+    try: report=_diagnostic_compare(baseline,candidate)
+    except (OSError,ValueError,TypeError,KeyError,AttributeError) as exc:
+        report={'schema_version':1,'baseline_run':None,'candidate_run':None,'warnings':[f'Invalid comparison record: {exc}'],
+                'deltas':{},'configuration_differences':{},'provenance_differences':{},'missing_evidence':[]}
+    errors=[f'{side}: {message}' for side,e in zip(('baseline','candidate'),evidence) for message in e['errors']]
+    conditional=[f'{side}: {message}' for side,e in zip(('baseline','candidate'),evidence) for message in e['conditional']]
+    # Preserve legacy diagnostic warnings; required evidence omissions do not become proof.
+    if exclusions: verification='NON_COMPARABLE'
+    elif report['warnings']: verification='NON_COMPARABLE'
+    elif errors: verification='NOT_VERIFIED'
+    elif conditional: verification='CONDITIONALLY_VERIFIED'
+    else: verification='VERIFIED'
+    report.update(verification_status=verification,evidence_errors=errors,conditional_evidence=conditional,exclusions=exclusions,
+        eligible_for_measured_comparison=verification in ('VERIFIED','CONDITIONALLY_VERIFIED'),
+        equivalent_protocol_verified=verification=='VERIFIED',
+        comparison_status={'VERIFIED':'COMPARABLE','CONDITIONALLY_VERIFIED':'CONDITIONALLY_COMPARABLE','NOT_VERIFIED':'NOT_VERIFIED','NON_COMPARABLE':'NON_COMPARABLE'}[verification])
+    for delta in report['deltas'].values():
+        if exclusions: delta.update(difference=None,status='EXCLUDED_INVALID_RUN')
+        elif verification not in ('VERIFIED','CONDITIONALLY_VERIFIED') and delta['status']!='MISSING_OR_INCOMPARABLE':
+            delta['status']='DIAGNOSTIC_ONLY_'+verification
+    return report
+
+
+def compare_collection(baseline, candidates):
+    """Aggregate only admitted result pairs and disclose every excluded pair."""
+    accepted=[]; excluded=[]
+    for candidate in candidates:
+        report=compare(baseline,candidate)
+        (accepted if report['eligible_for_measured_comparison'] else excluded).append({'path':str(candidate),'report':report})
+    return {'comparisons':accepted,'exclusions':excluded,'included_count':len(accepted),'excluded_count':len(excluded)}

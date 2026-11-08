@@ -50,3 +50,7 @@ def validate_packed(model):
     declared=getattr(getattr(model,'config',None),'pruned_intermediate_sizes',None)
     if declared is not None and widths!=declared:
         raise ValueError('Pruning metadata disagrees with actual MLP dimensions')
+
+    if getattr(getattr(model,'model',None),'layers',None):
+        from VLM.quantization.portable_integrity import describe
+        describe(model)

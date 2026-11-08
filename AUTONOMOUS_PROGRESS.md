@@ -145,3 +145,15 @@ Pending; tests and synthetic CPU file measurements are distinct evidence.
 - Status: NO-GO retained. Next task is independent CPU review; no GPU pilot queued. Real metrics remain Pending/Not measured.
 
 Mission 9 synchronization: implementation/report commit 92e69f84d74e37acf391cc4e4e409e30f6a483c0 pushed successfully to origin/fix/mission-9-research-integrity. Baseline handoff branch remains ba68888; local work baseline remains 66c1d25. No merge/PR/force push/branch deletion. Subsequent ledger-only commit records this synchronization without changing validated source.
+
+## Mission 11 — comparison and portable loader integrity (2026-11-08)
+- Branch: fix/mission-11-comparison-loader-integrity, based exactly on 09a57c229af79e6c9caff15aa5e7051856f03fc3. Commit synchronization follows below.
+- Reproductions: four pre-fix tests failed for empty evidence, failed runs, conflicting precision and invalid attention. Evidence: /workspace/audits/mission11-before.log.
+- Completed: strict comparison evidence/content validation and four verification states; lifecycle exclusions and mixed-collection API; canonical precision, declarative header admission before trusted unpickling, inner/outer/tensor reconciliation, supported Phi dependency validation and export checks.
+- Changed files: experiments/evidence.py, compare.py and tests/test_mission11.py; VLM/quantization/portable_integrity.py, awq_model_loader.py and awq_quantize.py; evaluation/integrity.py; Mission 11 report and these progress/decisions/handoff records.
+- Validation: full release suite 350 passed, zero failures/skips, one existing Starlette/AnyIO warning (33.38 seconds); final hash-budget guard rerun recorded below. All 305 preexisting tests retained, plus 45 new adversarial cases. Python compilation passed for 182 sources. Frontend TypeScript and Vite build passed (1,676 modules); whitespace checks passed.
+- Intermediate failures: JSON int-key normalization and legacy missing-metric CSV status initially failed; implementation corrected without changing old assertions. No unresolved failed tests are claimed hidden.
+- Resources: existing CPU environment, tiny synthetic local fixtures only; no new dependencies, models/datasets, paid APIs/infrastructure, billing actions or GPU execution.
+- Remaining: independent Mission 12 verification; exact pretrained assets/calibration/lineage and task/scorer decisions; complete supported real-model formats; financial authorization and CUDA/L4 feasibility. NO-GO remains; real results Pending/Not measured.
+
+Mission 11 final acceptance rerun after enforcing the hash budget on configuration/portable-header checks: 350 passed, zero failures/skips, one third-party warning, 34.51 seconds. Source compilation and whitespace checks passed. Base branches rechecked unchanged at 09a57c2 (Mission 9) and ba68888 (consolidated handoff).

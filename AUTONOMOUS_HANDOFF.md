@@ -178,3 +178,13 @@ Unsupported/unverified: full-model compressed multimodal evaluation bridge, hete
 Next: independently review Mission 9 and rerun CPU regressions; resolve pinned licensed assets, held-out task/scorer, zero-overage/storage policy and separate GPU authorization. Only then consider a small dense diagnostic. No GPU pilot was launched or queued. All real research metrics remain Pending/Not measured.
 
 Mission 9 implementation and validation commit: [92e69f84d74e37acf391cc4e4e409e30f6a483c0](https://github.com/Balaji-s-08-tech/final_year_project/commit/92e69f84d74e37acf391cc4e4e409e30f6a483c0), pushed to [fix/mission-9-research-integrity](https://github.com/Balaji-s-08-tech/final_year_project/tree/fix/mission-9-research-integrity). Final evidence: 305 CPU tests passed, one third-party warning; 179 Python files compiled; frontend type check/build passed. Ledger-only synchronization follows this source commit. NO-GO remains pending independent audit.
+
+## Mission 11 superseding comparison/loader handoff
+
+Branch: fix/mission-11-comparison-loader-integrity, exact parent 09a57c229af79e6c9caff15aa5e7051856f03fc3. See [repair report](docs/reports/MISSION_11_COMPARISON_LOADER_REPAIRS.md) for original reproductions, mandatory evidence, lifecycle admission, portable format contracts, tests and limitations.
+
+Public compare() now validates core evidence, rechecks available asset content under an explicit hash budget, and reports four verification states. Failed/cancelled/incomplete/invalid runs cannot receive COMPARABLE/VERIFIED. compare_collection includes only eligible pairs and discloses every exclusion. Diagnostic-only differences are distinct from admitted research comparisons.
+
+Supported portable exports include declarative architecture/precision headers. Public loader checks headers before trusted pickle construction and reconciles metadata/tensors/attention dependencies before returning a model. Headerless legacy portable files are unsupported; reviewed re-export is required. Pickle remains trusted executable code, not a secure format for arbitrary producers. Actual tensor checks follow deserialization; declared invalid dimensions fail before it.
+
+All original CPU regression tests and seven synthetic treatments remain required. No real research results are introduced. Dense pilot and compression research remain NO-GO pending Mission 12 independent review, exact licensed assets and complete provenance, official held-out protocol/scorer, CUDA environment/fit evidence, zero-overage/storage confirmation and separate execution authorization. No GPU pilot was launched or queued.

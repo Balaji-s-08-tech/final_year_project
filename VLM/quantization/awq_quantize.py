@@ -325,6 +325,8 @@ def _save_output(output_dir: Path, model: nn.Module, tokenizer, config: AWQConfi
         raise ValueError("Export precision must match the model's packed AWQ layers")
     from evaluation.integrity import validate_packed
     validate_packed(model)
+    from VLM.quantization.portable_integrity import describe
+    portable_architecture, portable_layers = describe(model)
     output_dir.mkdir(parents=True, exist_ok=True)
     metadata = {"quantization": config.to_dict(), "source": dict(source), "summary": dict(summary), "model_config": model.config.to_dict()}
     metadata_path = output_dir / "awq_config.json"
@@ -337,6 +339,7 @@ def _save_output(output_dir: Path, model: nn.Module, tokenizer, config: AWQConfi
     write_json(checkpoint.with_name(checkpoint.name + ".metadata.json"), {
         "schema_version": 1, "filename": checkpoint.name, "size_bytes": digest["size_bytes"], "sha256": digest["sha256"],
         "format": "portable_awq", "precision": f"AWQ INT{config.bits}",
+        "architecture": portable_architecture, "packed_layers": portable_layers,
         "model_config_sha256": canonical_hash(metadata["model_config"]),
         "quantization": {"method": "AWQ", "bits": config.bits, "calibration": config.to_dict()},
     })
