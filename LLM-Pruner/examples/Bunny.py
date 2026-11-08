@@ -20,7 +20,7 @@ import LLMPruner.torch_pruning as tp
 from LLMPruner.pruner import phi2_pruner as phi_pruner
 from LLMPruner.utils.logger import LoggerWithDepth
 from LLMPruner.evaluator.ppl import PPLMetric
-from LLMPruner.datasets.example_samples import get_examples
+from LLMPruner.datasets.example_samples import get_examples, bunny_pruning_loss
 from LLMPruner.templates.prompts import prompts
 from VLM.bunny.model.builder import load_pruned_bunny_model
 
@@ -165,6 +165,8 @@ def main(args):
                         loss.backward()
 
                         for module_param in model.parameters():
+                            if module_param.grad is None:
+                                continue
                             module_param.grad = module_param.grad * module_param.grad / args.num_examples
                             if hasattr(module_param, 'acc_grad'):
                                 module_param.acc_grad += module_param.grad
@@ -182,10 +184,7 @@ def main(args):
                 print("Preparing model for distributed training...")
                 model = torch.nn.DataParallel(model)
                 if args.dataset == "bunny":
-                    input_embeds = example_prompts[0]
-                    labels = example_prompts[1]
-                    attention_mask = example_prompts[2]
-                    loss = model(inputs_embeds=input_embeds, labels=labels, attention_mask=attention_mask).loss
+                    loss = bunny_pruning_loss(model, example_prompts)
                 else:
                     loss = model(example_prompts, labels=example_prompts).loss   
                 logger.log("Loss = {}".format(loss))
@@ -237,15 +236,12 @@ def main(args):
         for i in range(args.iterative_steps):
             if pruner_type in ['taylor']:
                 logger.log("Start Backwarding in iterative steps = {}...".format(i))
-                example_prompts = get_examples(args.dataset, tokenizer, args.num_examples, seq_len=args.seq_len_prune, batch=True).to(args.device)
+                example_prompts = get_examples(args.dataset, tokenizer, args.num_examples, seq_len=args.seq_len_prune, batch=True)
                 if args.dataset == "bunny":
-                    input_embeds = example_prompts[0]
-                    labels = example_prompts[1]
-                    attention_mask = example_prompts[2]
-                    loss = model(inputs_embeds=input_embeds, labels=labels, attention_mask=attention_mask).loss
+                    loss = bunny_pruning_loss(model, example_prompts, args.device)
                 else:
+                    example_prompts = example_prompts.to(args.device)
                     loss = model(example_prompts, labels=example_prompts).loss   
-                loss = model(example_prompts, labels=example_prompts).loss
                 logger.log("Loss = {}".format(loss))
                 loss.backward()
 
