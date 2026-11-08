@@ -1,5 +1,13 @@
 # Cloud experiment runbook
 
+**Current policy (2026-11-08):** GPU execution is NOT authorized while Camber
+credit-exhaustion/overage policy is unconfirmed. The commands and A100 proposals
+below are historical preparation, not permission to activate a node or spend
+credits. Use [Mission 3 evaluation preparation](docs/BASELINE_EVALUATION.md) and
+its read-only preflight instead. The legacy probe now requires explicit execution
+acknowledgement and RAM/VRAM budgets before loading; obsolete implicit 32/48 GiB
+gates were removed. No GPU experiment has been run in this Codex session.
+
 This is a reproducible manual runbook, not a cloud provisioning script. It does not create paid resources, download model/data, or start training. Run each expensive stage only after reviewing the inputs and resource budget.
 
 ## Resource and compatibility audit

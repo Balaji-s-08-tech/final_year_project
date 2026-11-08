@@ -81,3 +81,35 @@ overflowing recovery state is rejected before parameter copies. Raw/reconstructe
 inputs explicitly retain UNVERIFIED recovery provenance; no training claim is made.
 Next bounded task: remove obsolete A100 admission defaults and require explicit
 authorization before the old model/GPU probe can initialize a CUDA context.
+
+Metadata/recovery repair commit: `98b245ec217824312d1ad18d4d8c29dd7bb7c29c`,
+pushed on fix/research-input-validation-004.
+
+### Final bounded CPU increment
+
+Removed obsolete probe memory defaults; load/forward requires explicit authorization
+and reviewed finite budgets, while default inspection avoids CUDA context calls.
+Added six CPU admission regressions. Hardened versioned metric document validation
+with eleven regressions, including HTTP 422 without writing invalid import runs.
+
+Final full repository command: `CUDA_VISIBLE_DEVICES='' HF_HUB_OFFLINE=1
+TRANSFORMERS_OFFLINE=1 python -m pytest -q` — **236 passed, 0 failed, 0 skipped**,
+one third-party Starlette/AnyIO deprecation warning. All source compilation, shell
+syntax and whitespace checks passed. This total preserves the prior 159 tests and
+adds 77 CPU cases across evaluation, sampling, metadata, recovery and probe gates.
+
+Stop condition reached: the independent CPU preparation and listed high-priority
+input/admission repairs are complete. No actual Bunny research weights, SigLIP
+weights, recovery output or held-out research data were verified locally. No node,
+GPU kernel/inference, paid API, model/data download, merge or force push occurred.
+
+Open work: official dataset/scorer and leakage protocol; verified recovery manifest
+and complete LoRA reconstruction; compressed multimodal evaluation bridge; remaining
+LLaVA/InternVL sampler paths; legacy model-loading duplication and serving cache
+path; multi-worker experiment scheduling/orphan supervision. These were not silently
+declared solved or replaced by mock success.
+
+Required outside actions: confirm Camber exhaustion/overage behavior, explicitly
+authorize any GPU execution, stage licensed pinned model/vision/data assets within
+the actual storage quota, and select the held-out evaluation/scoring protocol.
+Until then, do not use the GPU acknowledgement flags or expand to cloud experiments.

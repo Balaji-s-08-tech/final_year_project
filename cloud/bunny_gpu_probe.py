@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -30,17 +31,12 @@ def _runtime() -> tuple[object, dict[str, str], dict[str, str]]:
         "transformers",
         "accelerate",
         "peft",
-        "datasets",
-        "wandb",
-        "deepspeed",
         "timm",
         "einops",
         "huggingface_hub",
         "PIL",
         "psutil",
-        "LLMPruner.evaluator.ppl",
         "VLM.bunny.model.builder",
-        "VLM.bunny.train.train_pruned",
         "VLM.quantization.awq_quantize",
     )
     torch = importlib.import_module("torch")
@@ -60,6 +56,8 @@ def _weight_files(path: Path) -> bool:
 
 
 def _load_and_forward(args: argparse.Namespace, torch: object) -> dict[str, object]:
+    if not getattr(args, "authorize_gpu_execution", False):
+        raise PermissionError("Model/GPU execution requires separate explicit authorization")
     os.environ["HF_HUB_OFFLINE"] = "1"
     model_dir = Path(args.model_dir).resolve()
     vision_dir = Path(args.vision_dir).resolve()
@@ -143,30 +141,43 @@ def main() -> int:
     parser.add_argument("--model-dir")
     parser.add_argument("--vision-dir")
     parser.add_argument("--image-path")
-    parser.add_argument("--minimum-free-vram-gib", type=float, default=32.0)
-    parser.add_argument("--minimum-free-ram-gib", type=float, default=48.0)
+    parser.add_argument("--minimum-free-vram-gib", type=float)
+    parser.add_argument("--minimum-free-ram-gib", type=float)
+    parser.add_argument("--authorize-gpu-execution", action="store_true",
+                        help="Only AFTER billing and GPU execution are separately authorized")
     args = parser.parse_args()
+    if args.load_model:
+        if not args.authorize_gpu_execution:
+            parser.error("--load-model requires --authorize-gpu-execution after separate billing confirmation")
+        if any(v is None or not math.isfinite(v) or v <= 0 for v in (args.minimum_free_vram_gib, args.minimum_free_ram_gib)):
+            parser.error("--load-model requires explicit positive finite RAM and VRAM budgets")
+        if not args.model_dir or not args.vision_dir or not args.image_path:
+            parser.error("--load-model requires local model/vision directories and an image path")
     try:
         torch, versions, missing = _runtime()
+        from experiments.provenance import capture
+        _, environment = capture(ROOT)
+        devices = environment.get("gpu_devices") or []
+        capability = bool(devices and torch.version.cuda)
         result = {
             "imports": versions,
             "missing_or_failed_imports": missing,
-            "cuda_available": torch.cuda.is_available(),
+            "cuda_available": capability,
+            "cuda_status": "CAPABILITY_ONLY_NOT_RUNTIME_VERIFIED",
+            "model_loaded": False,
+            "gpu_devices": devices or None,
         }
-        if torch.cuda.is_available():
-            result["gpu_name"] = torch.cuda.get_device_name(0)
-            free_vram, total_vram = torch.cuda.mem_get_info()
-            result["gpu_free_gib"] = round(free_vram / 1024**3, 2)
-            result["gpu_total_gib"] = round(total_vram / 1024**3, 2)
-        if missing or not torch.cuda.is_available():
+        if missing or not capability:
             result["result"] = "BLOCKED"
             print(json.dumps(result, indent=2))
             return 2
-        result["model_loaded"] = False
+        result["result"] = "PREFLIGHT_ONLY"
         if args.load_model:
             if not args.model_dir or not args.vision_dir or not args.image_path:
                 raise RuntimeError("--load-model requires --model-dir, --vision-dir, and --image-path")
             result["multimodal_forward"] = _load_and_forward(args, torch)
+            result["model_loaded"] = True
+            result["result"] = "PASS"
         print(json.dumps(result, indent=2))
         return 0
     except Exception as exc:

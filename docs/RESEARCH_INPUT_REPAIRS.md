@@ -66,3 +66,26 @@ recovery training manifest remain future work. In particular, a full multimodal
 state may need its vision modules initialized before strict loading; no fallback
 to partial copying is provided. Serialized files must remain trusted; no attempt
 is made to sandbox Python pickle execution.
+
+Versioned benchmark documents also require the documented object/measurement
+fields and an integer schema version. Malformed list/null documents, unknown or
+incomplete measurement fields, and invalid quantization/calibration structures
+produce validation failures/HTTP 422 before any imported run is created, rather
+than an API attribute error or a silently defaulted measurement.
+
+## Legacy GPU probe admission
+
+The old probe no longer assumes an A100-like 32 GiB free VRAM / 48 GiB free RAM.
+Loading requires explicit positive finite memory budgets, local asset paths and
+--authorize-gpu-execution; policy checks occur before runtime imports. Its private
+load function also rejects an unauthorized call. Default inspection queries
+nvidia-smi metadata and installed PyTorch CUDA capability without calling CUDA
+context APIs, and explicitly labels that information as capability-only. It does
+not prove runtime compatibility or authorize billing. Training-only imports
+(datasets, W&B, DeepSpeed, trainer) were removed from this inference probe's
+prerequisites; training dependency validation is still necessary before recovery.
+
+Six CPU tests cover forbidden execution, missing/nonfinite budgets, missing paths,
+the private gate and avoidance of CUDA context APIs. Use the Mission 3 tracked
+evaluation CLI for actual future baseline experiments; the older probe is only a
+manual admission/finite-forward diagnostic and has not run on the L4.
