@@ -24,7 +24,19 @@ def main():
         config = read_json(args.config)
         print(ExperimentStore(args.root).create(args.name, config, model=config.get("model"), dataset=config.get("dataset"), source_paths=config.get("source_paths", ())).path)
     elif args.command == "history":
-        print(json.dumps([run.latest() for run in ExperimentStore(args.root).runs()], indent=2))
+        records = []
+        for run in ExperimentStore(args.root).runs():
+            try:
+                state = run.latest()
+                if not isinstance(state, dict) or state.get('run_id') != run.path.name or state.get('status') not in {'CREATED', 'QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'}:
+                    raise ValueError('Invalid lifecycle object or run identity')
+                records.append(state)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                error = {'type': type(exc).__name__, 'message': str(exc)}
+                if hasattr(exc, 'as_dict'):
+                    error.update(exc.as_dict())
+                records.append({'status': 'INVALID', 'path': str(run.path), 'stage': 'lifecycle', 'error': error})
+        print(json.dumps(records, indent=2, allow_nan=False))
     else:
         report = compare(args.baseline, args.candidate)
         write_json(args.output, report)

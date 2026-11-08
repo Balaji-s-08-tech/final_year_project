@@ -1,28 +1,24 @@
 """Local, explicit content manifests. No asset acquisition or remote clients."""
 from pathlib import Path
 from experiments.provenance import file_hash, canonical_hash
+from experiments.assets import inventories, DEFAULT_ASSET_LIMITS
 
 
-def model_manifest(root, identifier, revision, *, hash_large=False):
+def model_manifest(root, identifier, revision, *, hash_large=False, limits=DEFAULT_ASSET_LIMITS):
     root = Path(root).resolve()
     if not root.is_dir() or not isinstance(identifier, str) or not identifier.strip() or not isinstance(revision, str) or not revision.strip() or revision.startswith("REPLACE_"):
         raise ValueError("Pinned local model identity/revision and directory are required")
-    files = {}
-    for file in sorted(root.rglob('*')):
-        if file.is_file():
-            if not file.resolve().is_relative_to(root):
-                raise ValueError("Asset symlink escapes its root")
-            files[str(file.relative_to(root))] = file_hash(file, None if hash_large else 8*1024*1024)
+    files = inventories([root], hash_large=hash_large, limits=limits)[0]
     if not files:
         raise ValueError("Empty asset directory")
     return {"schema_version": 1, "kind": "model", "identifier": identifier, "revision": revision,
             "files": files, "status": "VERIFIED_LOCAL_CONTENT" if all(v['status']=='HASHED' for v in files.values()) else "INCOMPLETE"}
 
 
-def verify_model_manifest(root, document, *, hash_large=False):
+def verify_model_manifest(root, document, *, hash_large=False, limits=DEFAULT_ASSET_LIMITS):
     if document.get('schema_version') != 1 or document.get('kind') != 'model':
         raise ValueError("Unsupported manifest")
-    actual = model_manifest(root, document['identifier'], document['revision'], hash_large=hash_large)
+    actual = model_manifest(root, document['identifier'], document['revision'], hash_large=hash_large, limits=limits)
     if actual['files'] != document['files'] or actual['status'] != 'VERIFIED_LOCAL_CONTENT':
         raise ValueError("Asset content differs or remains unverified")
     return actual

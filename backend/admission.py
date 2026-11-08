@@ -1,6 +1,6 @@
 """Bound request bodies before Starlette/Pydantic parse or allocate JSON objects."""
 from starlette.responses import JSONResponse
-from experiments.jsonio import JsonLimits, loads
+from experiments.jsonio import JsonLimits, JsonValidationError, loads
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
 
@@ -49,6 +49,8 @@ class RequestAdmission:
         if body and headers.get(b'content-type', b'').split(b';')[0].strip().lower() == b'application/json':
             try:
                 loads(body, limits=JsonLimits(max_bytes=MAX_BODY_BYTES))
+            except JsonValidationError as exc:
+                return await JSONResponse({'detail': exc.as_dict()}, status_code=422)(scope, receive, send)
             except (ValueError, TypeError) as exc:
                 return await JSONResponse({'detail': f'Invalid bounded JSON: {exc}'}, status_code=422)(scope, receive, send)
         consumed = False

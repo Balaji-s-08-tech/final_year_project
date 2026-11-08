@@ -1,7 +1,7 @@
 """One bounded JSON number contract: signed INT64 and finite binary64, no underflow."""
 import json
 import math
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from dataclasses import dataclass
 from pathlib import Path
 import os
@@ -109,17 +109,39 @@ def validate(value, *, max_depth=None, limits=DEFAULT_LIMITS):
     return value
 
 
-def _integer(text):return validate(int(text))
+class JsonValidationError(ValueError):
+    """A machine-readable rejection that existing ValueError readers can isolate."""
+
+    def __init__(self, message, *, code="INVALID_JSON_NUMBER"):
+        super().__init__(message)
+        self.code = code
+
+    def as_dict(self):
+        return {"code": self.code, "message": str(self)}
+
+
+def _integer(text):
+    try:
+        return validate(int(text))
+    except (ValueError, OverflowError) as exc:
+        raise JsonValidationError(str(exc)) from exc
 
 
 def _float(text):
-    value=float(text)
-    validate(value)
-    if value==0 and not Decimal(text).is_zero():raise ValueError('JSON number underflows binary64')
-    return value
+    try:
+        value = float(text)
+        validate(value)
+        # Decimal construction itself can reject an exponent, even when float()
+        # returned zero. Normalize that failure at the shared trust boundary.
+        if value == 0 and not Decimal(text).is_zero():
+            raise ValueError('JSON number underflows binary64')
+        return value
+    except (ValueError, OverflowError, DecimalException) as exc:
+        message = str(exc) if isinstance(exc, ValueError) else f'JSON number cannot be represented safely ({type(exc).__name__})'
+        raise JsonValidationError(message) from exc
 
 
-def _constant(text):raise ValueError(f'Nonfinite JSON number: {text}')
+def _constant(text):raise JsonValidationError(f'Nonfinite JSON number: {text}')
 
 
 def _object(pairs):
