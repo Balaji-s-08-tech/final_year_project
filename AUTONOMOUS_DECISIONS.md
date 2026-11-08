@@ -22,3 +22,13 @@ weight hashes incomplete. Save the model's effective generation configuration ra
 than only requested kwargs. Compare actual saved assets/settings and warn when identity
 is incomplete. Alternative: full hashing every initialization; rejected due large
 checkpoint cost. No requested revision string is treated as content authentication.
+
+## Architecture review and protocol boundaries
+Reviewed Phi shared LayerNorm/attention/MLP, SigLIP/projector and duplicate legacy
+loaders. Preserve legacy vendor paths instead of an unvalidated consolidation.
+Support physical MLP slicing only when both dependent linears can be validated;
+head/vision/projector changes remain design-only until their interfaces are proven.
+Use local manifests and selected ID/image overlap checks rather than claiming
+absence of semantic/pretraining leakage. No official scorer or revision is guessed.
+Validation: tiny real multimodal integration, manifest roundtrip/change rejection,
+CPU suite. Risk: unavailable full assets and large-file hashing remain explicit.

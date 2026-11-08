@@ -21,3 +21,16 @@ incomplete unless supplied by later verified asset manifests. Next: 3.6/3.7 arch
 and baseline protocol, then CPU pruning, quantization verification and pipeline.
 
 Commit SHAs are appended after each milestone commit in its dependent milestone.
+
+Mission 3.5 committed/pushed: 6cd00f9e5e6ab0b643c0a2b6d076f76f2625aa72.
+Frontend type/build passed. Audit resolution is in docs/reports/RESEARCH_INTEGRITY_REPAIRS.md.
+
+## Missions 3.6 / 3.7 — architecture and baseline protocol
+Branch: docs/mission-3-6-3-7-protocol, stacked above 3.5. Architecture/dependency
+diagram and baseline protocol distinguish full visual evaluation from portable
+text controls. Added local model manifest construction/verification and selected
+split-disjointness checks, with three CPU tests. Full suite: 248 passed, no failures
+or skips, one existing warning. Protocol/model/dataset templates intentionally do
+not invent unavailable pinned revisions or official scorer decisions. Current code
+changes are manifests and tests; documentation does not claim unavailable assets
+or full reconstruction/GPU validation. Next: architecture-specific pruning.
