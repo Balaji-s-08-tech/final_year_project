@@ -11,7 +11,7 @@ def asset_manifest(config):
             continue
         root = Path(source)
         paths = [root] if root.is_file() else sorted(p for p in root.rglob("*") if p.is_file())
-        files = {p.name if root.is_file() else str(p.relative_to(root)): file_hash(p) for p in paths}
+        files = {p.name if root.is_file() else str(p.relative_to(root)): file_hash(p, None if getattr(config,'hash_large_assets',False) else 8*1024*1024) for p in paths}
         manifest[region] = {"path": str(root), "files": files, "status": "CONTENT_HASHED" if files and all(v["status"] == "HASHED" for v in files.values()) else "INCOMPLETE"}
     manifest["sha256"] = canonical_hash(manifest)
     return manifest

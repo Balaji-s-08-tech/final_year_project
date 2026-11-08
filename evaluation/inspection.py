@@ -58,6 +58,8 @@ def compatibility(config):
     vision = local_checkpoint(config.vision_path)
     errors.extend(model["errors"] + vision["errors"])
     mcfg, vcfg = model["config"] or {}, vision["config"] or {}
+    if mcfg.get('quantization_config') is not None:
+        errors.append('Dense baseline cannot implicitly load an external quantized backend')
     if mcfg.get("model_type") != "bunny-phi":
         errors.append("Only the repository Bunny Phi-2 (bunny-phi) adapter is supported")
     if mcfg.get("mm_projector_type", "mlp2x_gelu") != "mlp2x_gelu":

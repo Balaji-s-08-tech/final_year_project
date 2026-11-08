@@ -14,6 +14,10 @@ INTERN_META_PATH = os.environ.get("INTERN_META_PATH", "")
 
 
 def load_dataset(*args, **kwargs):
+    from runtime_policy import require_local_asset
+    if not args:
+        raise ValueError("Explicit local dataset source required")
+    require_local_asset(args[0])
     from datasets import load_dataset as load
     return load(*args, **kwargs)
 

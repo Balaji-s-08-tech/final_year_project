@@ -59,3 +59,19 @@ actual bytes but make no speed or real-quality claim. Mandatory modality-specifi
 predictor/effective settings prevent accidental text/vision score mixing. CLI has
 no real-model or GPU load option. Validation: all seven text treatments, tiny real
 multimodal combined path, serialization, failure and overlap/budget rejection.
+
+## Final offline and packaging boundary
+Legacy remote HF references could acquire weights without GPU execution. Require
+local sources before transformer calls; prevent automatic device-map/quantized
+backend activation. The old hardcoded full-model smoke script is disabled rather
+than implying its single flag also authorizes acquisition. Alternative: silently
+rely on network policy; rejected because policy can change and cache misses should
+not initiate acquisition. CPU fixtures verify early rejection and local operation.
+
+Expose dataset split explicitly and opt-in large-file hashing with a reviewed I/O
+budget; missing identity remains null/INCOMPLETE rather than a fabricated hash.
+The exact installed CPU version lock is Linux/Python-specific, not a wheel-hash or
+CUDA lock. Keep the first real dense GPU pilot distinct from the bounded synthetic
+compression composition path. Stop further work that needs assets, task judgment,
+GPU execution or unverified cross-modal reconstruction. These limits preserve
+scientific credibility instead of claiming full-model success from unit tests.

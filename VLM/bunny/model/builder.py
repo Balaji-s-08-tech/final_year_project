@@ -15,6 +15,16 @@ warnings.filterwarnings('ignore')
 def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from runtime_policy import admit_placement
+    if device == "cpu":
+        device_map = {"": "cpu"}
+    admit_placement(device_map, authorize_gpu)
+    if not authorize_gpu and any(kwargs.get(k) for k in ("load_in_4bit", "load_in_8bit", "quantization_config")):
+        raise PermissionError("Quantized backend activation requires separate authorization")
+    from runtime_policy import require_local_asset
+    bunny_model_path = require_local_asset(bunny_model_path)
+    if (load_8bit or load_4bit) and not authorize_gpu:
+        raise PermissionError("Quantized backend activation requires separate authorization")
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:
@@ -101,6 +111,16 @@ def load_pruned_bunny_model(bunny_model_path, pruned_model_path=None, mm=None, l
 def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=None, lora=None, device_map="", device="cuda", load_8bit=False, load_4bit=False,  authorize_gpu=False, **kwargs):
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from runtime_policy import admit_placement
+    if device == "cpu":
+        device_map = {"": "cpu"}
+    admit_placement(device_map, authorize_gpu)
+    if not authorize_gpu and any(kwargs.get(k) for k in ("load_in_4bit", "load_in_8bit", "quantization_config")):
+        raise PermissionError("Quantized backend activation requires separate authorization")
+    from runtime_policy import require_local_asset
+    bunny_model_path = require_local_asset(bunny_model_path)
+    if (load_8bit or load_4bit) and not authorize_gpu:
+        raise PermissionError("Quantized backend activation requires separate authorization")
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:
@@ -201,6 +221,15 @@ def load_pruned_bunny_model_all(bunny_model_path, pruned_model_path=None, mm=Non
 def load_distillation_model(teacher_model_path, student_model_path, pruned_model_path, mm=None, lora=None, device_map=None, device="cuda",  authorize_gpu=False, **kwargs):
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from runtime_policy import admit_placement
+    if device == "cpu":
+        device_map = {"": "cpu"}
+    admit_placement(device_map, authorize_gpu)
+    if not authorize_gpu and any(kwargs.get(k) for k in ("load_in_4bit", "load_in_8bit", "quantization_config")):
+        raise PermissionError("Quantized backend activation requires separate authorization")
+    from runtime_policy import require_local_asset
+    teacher_model_path = require_local_asset(teacher_model_path)
+    student_model_path = require_local_asset(student_model_path)
     # Load teacher model
     _, teacher_model = load_pruned_bunny_model(teacher_model_path, device=device, authorize_gpu=authorize_gpu)
     # Load student model and tokenizer
@@ -253,6 +282,16 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
                           device_map="auto", device="cuda", authorize_gpu=False, **kwargs):
     from runtime_policy import admit_device
     device = admit_device(device, authorize_gpu)
+    from runtime_policy import admit_placement
+    if device == "cpu":
+        device_map = {"": "cpu"}
+    admit_placement(device_map, authorize_gpu)
+    if not authorize_gpu and any(kwargs.get(k) for k in ("load_in_4bit", "load_in_8bit", "quantization_config")):
+        raise PermissionError("Quantized backend activation requires separate authorization")
+    from runtime_policy import require_local_asset
+    model_path = require_local_asset(model_path)
+    if model_base is not None:
+        model_base = require_local_asset(model_base)
     if model_type not in {'phi-1.5', 'phi-2', 'phi-3', 'stablelm-2', 'qwen1.5-1.8b', 'minicpm', 'llama3-8b'}:
         raise ValueError(f"Unknown Model Type {model_type}")
 
@@ -261,6 +300,8 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
     if device != "cuda":
         kwargs['device_map'] = {"": device}
 
+    if (load_8bit or load_4bit) and not authorize_gpu:
+        raise PermissionError("Quantized backend activation requires separate authorization")
     if load_8bit:
         kwargs['load_in_8bit'] = True
     elif load_4bit:

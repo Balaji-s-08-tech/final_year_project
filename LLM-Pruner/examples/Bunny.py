@@ -35,6 +35,8 @@ def main(args):
     from runtime_policy import admit_device
     admit_device(args.device, getattr(args, "authorize_gpu_execution", False))
     admit_device(args.eval_device, getattr(args, "authorize_gpu_execution", False))
+    from runtime_policy import require_local_asset
+    args.base_model = require_local_asset(args.base_model)
     set_random_seed(args.seed)
 
     if args.short:

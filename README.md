@@ -1,56 +1,83 @@
-﻿# Enhancing Structured Pruning with Activation-Aware Weight Quantization (AWQ) for Efficient Large Vision-Language Models
+# VLM Compression Optimizer
 
-This repository contains the implementation of a compound compression pipeline for Large Vision-Language Models (VLMs), targeting the Bunny-v1.0-3B model (Phi-2 backbone).
+A CPU-validated research engineering framework for Bunny/Phi-2 with a SigLIP vision
+encoder. The research question is whether structured pruning, sparsity and AWQ can
+improve the quality/resource trade-off under controlled evaluation. No real model
+quality, GPU fit, recovery success or inference speedup has been established.
 
-## 1. Project Objective
-To enable efficient inference of large multimodal models on consumer-grade hardware by cascading two state-of-the-art compression techniques: structured pruning and activation-aware weight quantization (AWQ).
+Start with [AUTONOMOUS_HANDOFF.md](AUTONOMOUS_HANDOFF.md) for the complete scope,
+reproduction steps, branch inventory and external prerequisites. Progress and
+engineering decisions are recorded in [AUTONOMOUS_PROGRESS.md](AUTONOMOUS_PROGRESS.md)
+and [AUTONOMOUS_DECISIONS.md](AUTONOMOUS_DECISIONS.md).
 
-## 2. Research Motivation
-Large Vision-Language Models (VLMs) demand prohibitive amounts of VRAM and compute for deployment. This project aims to demonstrate that applying structured pruning (to shrink the macro-architecture) followed by AWQ INT4 (to compress the micro-weights) provides a compounding efficiency benefit suitable for edge and consumer hardware, without requiring entirely new model architectures.
+## Implemented and validated scope
 
-## 3. Project Architecture & Pipeline
-1. **Base Model:** Bunny-v1.0-3B
-   - **Vision Tower:** SigLIP (google/siglip-so400m-patch14-384)
-   - **MLP Projector**
-   - **Language Backbone:** Phi-2 (BAAI/Bunny-v1_0-3B)
-2. **Structured Pruning:** Removes entire attention heads and MLP channels to physically shrink the architecture.
-3. **LoRA Recovery:** Recovers accuracy lost during pruning via LoRA fine-tuning.
-4. **AWQ INT4:** Quantizes the recovered, structurally pruned weights to 4-bit precision.
-5. **Compressed Deployment:** Final highly compressed model execution.
+- Configuration-driven local baseline evaluation, actual generated-token counts,
+  image/data fingerprints and effective inference provenance.
+- Unique immutable experiment directories, versioned metrics, source/environment
+  snapshots, logs, comparison JSON/CSV and compatible API result records.
+- Phi language-linears magnitude masks and paired physical MLP neuron reduction;
+  small complete Bunny/SigLIP forward and generation tests.
+- Portable INT4/INT8 AWQ calibration/scaling/clipping/packing and checkpoint checks.
+- Bounded CPU dense/pruned/AWQ/combined comparison suite, with actual saved artifact
+  sizes and explicitly synthetic quality evidence.
+- FastAPI research dashboard and React interface; API jobs remain CPU-only.
 
-The structured pruning and AWQ quantization explicitly target the **Phi-2 LM Backbone** (32 decoder layers).
+Physical attention/vision/projector pruning, full-model recovery reconstruction,
+official task scorers and optimized sparse/INT4 kernels remain unsupported or
+unverified. A mask does not prove compression or acceleration. Portable AWQ layers
+dequantize in PyTorch. Real research checkpoints and held-out assets are absent.
 
-## 4. Our Contribution
-Our primary novel contribution is the integration of **AWQ (Activation-Aware Weight Quantization) after structured pruning and LoRA recovery**. The upstream pruning scripts are derived from LLM-Pruner/Bunny; our work enables the quantizer to correctly calibrate and pack structurally non-uniform layers into PackedAWQLinear INT4 matrices.
+## CPU development
 
-## 5. Repository Structure
-- LLM-Pruner/: Core structured pruning algorithms and evaluation scripts, heavily modified to support lazy loading and cross-platform compatibility.
-- VLM/bunny/: The Bunny model definition (Phi-2 multimodal integration) and LoRA recovery scripts (	rain_pruned.py).
-- VLM/quantization/: Our integrated AWQ implementation, encompassing the Phi-2 structural parsers, calibration data builders, model loaders, and quantizers.
-- equirements-bunny-awq.txt: Strict dependency pin required to ensure proper Phi-2 + SigLIP alignment.
+Use Python 3.11 and the prepared `.venv-vlm-awq` environment. The installed Linux CPU
+versions are recorded in `requirements-cpu.lock`; this is a version lock, not a
+wheel-hash lock or a CUDA environment. Fresh dependency installation requires normal
+approved package-registry access; no automatic model or dataset acquisition exists.
 
-## 6. Installation
-The project relies on a strict Python 3.11 environment with specific PyTorch and Transformers versions to handle Phi-2 + SigLIP compatibilities (e.g., 	ransformers==4.37.2).
+```bash
+CUDA_VISIBLE_DEVICES='' HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+HF_HOME=/workspace/.cache/huggingface .venv-vlm-awq/bin/python -m pytest -q
 
-1. Clone the repository.
-2. Create a virtual environment: python -m venv .venv-vlm-awq
-3. Activate it: .\.venv-vlm-awq\Scripts\activate
-4. Install dependencies: pip install -r requirements-bunny-awq.txt
-5. Set your Hugging Face cache location to a drive with sufficient space:
-   `ash
-   export HF_HOME=/path/to/large/drive/hf_cache
-   `
+CUDA_VISIBLE_DEVICES='' HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+.venv-vlm-awq/bin/python -m compression --config configs/compression/synthetic_suite.json --output checkpoints/synthetic_experiments
+```
 
-## Experiment tracking and benchmark infrastructure
+The synthetic CLI constructs a tiny random model locally and creates unique output
+runs. It has no model-download or GPU option. Its results must not be represented as
+full Bunny research results. The prior environment/setup reports describe historical
+machines; they are not current checkpoint availability evidence.
 
-See [the versioned experiment tracking contract](docs/EXPERIMENT_TRACKING.md) for
-immutable run storage, metric schemas, CLI/API compatibility, precision provenance,
-comparison JSON/CSV, and the separate Codex-to-Camber handoff. This infrastructure
-does not establish GPU performance or model quality results.
+## Guides and components
 
-For offline baseline evaluation, read [Mission 3 preparation](docs/BASELINE_EVALUATION.md).
-The persistent [engineering progress log](PROGRESS.md) records commits, CPU evidence,
-asset availability, blockers and the next authorized steps.
+| Area | Guide / implementation |
+| --- | --- |
+| Architecture and supported boundaries | [Architecture](docs/ARCHITECTURE.md), `evaluation/`, `compression/` |
+| Baseline specification, manifests and acquisition checklist | [Protocol](docs/BASELINE_PROTOCOL.md) |
+| Evaluator and external L4 handoff | [Evaluation](docs/BASELINE_EVALUATION.md) |
+| Pruning | [Methodology](docs/PRUNING_METHODOLOGY.md) |
+| AWQ and tensor/checkpoint validation | [Methodology](docs/AWQ_METHODOLOGY.md), `VLM/quantization/` |
+| Combined experiments and artifact format | [Pipeline](docs/COMBINED_PIPELINE.md) |
+| Tracking, metrics and schemas | [Contract](docs/EXPERIMENT_TRACKING.md), `experiments/`, `docs/schemas/` |
+| Dashboard | [API/UI guide](DASHBOARD.md), `backend/`, `Interface/` |
+| Final research report | [Template](docs/FINAL_EXPERIMENT_REPORT_TEMPLATE.md) |
 
-## 7. Current Implementation Scope
-The pipeline has been engineered to support heterogeneous layer sizes generated by the structured pruner. All lazy-loading patches for the Bunny implementation have been completed, and the AWQ INT4 scaling, clipping, and packing steps mechanically support the non-uniform Phi-2 backbone. Full multimodal LoRA recovery relies on substantial VRAM (>24GB) to compute vision-language gradients and thus requires cloud deployment.
+Legacy LLM-Pruner, ShortGPT and copied AWQ modules remain for provenance and separate
+research investigation. Do not assume every legacy entry point is a supported
+pipeline. Local asset and device admission now reject implicit remote acquisition
+and unauthorized CUDA on the supported Bunny paths; this is not a sandbox for
+arbitrary Python or untrusted pickle code.
+
+## Research results and resource policy
+
+| Experiment | Quality | Latency | Throughput | VRAM | Size |
+| --- | --- | --- | --- | --- | --- |
+| Dense | Pending | Pending | Pending | Pending | Pending |
+| Pruned | Pending | Pending | Pending | Pending | Pending |
+| AWQ | Pending | Pending | Pending | Pending | Pending |
+| Combined | Pending | Pending | Pending | Pending | Pending |
+
+No GPU nodes, paid APIs, cloud resources or large model/data downloads are authorized
+by these instructions. Camber credit-exhaustion/overage and persistent storage policies
+must be confirmed separately. GPU flags are operator acknowledgements, not financial
+approval or fit evidence. No feature branch is automatically merged into main.

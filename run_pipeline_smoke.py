@@ -282,6 +282,7 @@ def main():
     parser.add_argument("--authorize-gpu-execution", action="store_true")
     args = parser.parse_args()
     admit_device("cuda", args.authorize_gpu_execution)
+    raise RuntimeError("Legacy full-model smoke acquisition is disabled; use the explicit local evaluation protocol")
     print("=" * 64)
     print("  VLM COMPRESSION PIPELINE SMOKE TEST")
     print("  Bunny-v1.0-3B / Phi-2")

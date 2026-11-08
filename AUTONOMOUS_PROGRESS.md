@@ -70,3 +70,47 @@ option is validated in final handoff checks. No GPU/large model execution.
 Changed pipeline/synthetic CLI/tests, adapter formatted-prompt support, quantization
 bias/finite-state validation and methodology/configuration. Next: final research
 package, exact reproduction commands, asset/billing blockers and quality audit.
+
+## Mission 7 — final research package and resource-boundary checks
+Mission 6 committed/pushed: 77e79b4f55b38f469014f28e672663726fec0fe1.
+Branch docs/mission-7-research-package. Consolidated README/handoff, methodology,
+protocol/manifests/config guide, artifact/benchmark documentation and Pending-only
+real-research matrix/report template. Recorded the actual Linux CPU dependency
+versions in requirements-cpu.lock and docs/CPU_ENVIRONMENT.json; no installation.
+
+Final review blocked implicit remote acquisition in legacy Bunny/encoder/dataset
+paths and disabled the historical full-model smoke script. Device-map and implicit
+quantized-backend admission are checked before model creation. Added regression
+coverage, explicit dataset_split and reviewed opt-in large-asset hashing. CPU split
+can remain explicitly unavailable; GPU admission requires a declared held-out split.
+Compatibility correction: legacy remote HF-ID loading no longer auto-downloads;
+use explicitly staged local assets and the controlled baseline adapter.
+
+Final suite: **276 passed, 0 failed, 0 skipped**, one existing Starlette/AnyIO
+warning. Frontend type check and production build passed. Compilation, shell syntax,
+local documentation links and whitespace checks passed. Configured synthetic CLI
+completed all seven treatments; each artifact was hash-checked/reloaded and its
+CPU forward was finite. Evidence is local temporary test data, not research results.
+No failed tests remain. Earlier tooling/path/patch errors were corrected before
+validation; no assertions or warnings were suppressed to pass tests.
+
+Changed files: M7 README/handoff/progress/decisions, CPU lock/environment, report
+template, runtime policy, legacy source/model/encoder gates, evaluator
+configuration/provenance/split capture, L4 template and relevant regressions. Full
+changed-file inventory is available from git diff a1b3272..HEAD. Tests/builds did
+not add research checkpoint/data binaries to Git.
+
+Resource usage: existing CPU workspace, small synthetic models and local file I/O;
+final full suite approximately 30 seconds, no allocation increase. GPU execution,
+cloud nodes, paid APIs, paid storage, billing changes, credential extraction and
+large model/data downloads: **NONE**. Main and original feature tips unchanged.
+No PRs created/merged. Read-only PR API inventory was Forbidden; native Git pushes
+worked and are recorded in the ledger. No source-history rewrite or force push.
+
+Stop condition: all implemented CPU milestones are validated; further real-model
+claims require licensed pinned model/encoder/tokenizer/processor assets, a held-out
+dataset and official scoring decision, recovery lineage and separate billing/GPU
+permission. Attention/vision physical reconstruction and optimized kernels remain
+explicitly unsupported, not speculatively implemented. Next meaningful external
+step: review AUTONOMOUS_HANDOFF.md and perform only the authorized dense pilot after
+those prerequisites are supplied. No automatic GPU work is queued.

@@ -36,7 +36,8 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                "config_sha256": model.get("config_sha256"), "checkpoint": config.model_path},
         dataset={"identifier": config.dataset_identifier, "revision": config.dataset_revision,
                  "fingerprint": report["dataset"]["fingerprint"], "evaluation": {"scorer": "normalized_exact_match_v1", "prompt_template": config.prompt_template,
-                 "sample_ids": report["dataset"]["sample_ids"], "max_input_tokens": config.max_input_tokens, "max_new_tokens": config.max_new_tokens}},
+                 "sample_ids": report["dataset"]["sample_ids"], "split": config.dataset_split,
+                 "max_input_tokens": config.max_input_tokens, "max_new_tokens": config.max_new_tokens}},
         source_paths=["evaluation/config.py", "evaluation/runner.py", "evaluation/adapters.py", "evaluation/data.py"])
     write_json(run.path / "assets.json", assets)
     write_json(run.path / "preflight.json", report)

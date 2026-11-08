@@ -54,6 +54,8 @@ class LocalAdapter:
             from bunny.model.language_model.bunny_phi import BunnyPhiConfig, BunnyPhiForCausalLM
             local = Path(config.model_path).resolve()
             model_config = BunnyPhiConfig.from_pretrained(local, local_files_only=True)
+            if getattr(model_config, 'quantization_config', None) is not None:
+                raise ValueError('Dense adapter refuses implicit quantized backend activation')
             model_config.mm_vision_tower = str(Path(config.vision_path).resolve())
             model_config.continuous_training = False
             self.tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, trust_remote_code=False)

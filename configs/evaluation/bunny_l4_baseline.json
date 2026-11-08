@@ -19,5 +19,7 @@
   "batch_size": 1,
   "treatment": "baseline",
   "required_free_ram_bytes": 25769803776,
-  "required_free_vram_bytes": 17179869184
+  "required_free_vram_bytes": 17179869184,
+  "dataset_split": "REPLACE_WITH_HELD_OUT_SPLIT",
+  "hash_large_assets": false
 }

@@ -73,3 +73,28 @@ def test_asset_changes_are_visible(tmp_path):
     first = asset_manifest(config)
     (tmp_path/'tokenizer.json').write_text('{"changed":true}')
     assert asset_manifest(config)['sha256'] != first['sha256']
+
+
+def test_legacy_model_loader_rejects_remote_source_before_acquisition(monkeypatch,tmp_path):
+    from VLM.quantization.awq_model_loader import _enable_project_imports
+    _enable_project_imports()
+    from bunny.model.builder import load_pruned_bunny_model
+    from transformers import AutoTokenizer
+    monkeypatch.setattr(AutoTokenizer,'from_pretrained',lambda *a,**k:pytest.fail('Attempted acquisition'))
+    with pytest.raises(FileNotFoundError,match='local assets'):
+        load_pruned_bunny_model('remote/model-not-staged',device='cpu')
+    with pytest.raises(PermissionError,match='backend'):
+        load_pruned_bunny_model(str(tmp_path),device='cpu',load_4bit=True)
+
+
+def test_encoder_remote_reference_rejected_before_model_creation():
+    from VLM.bunny.model.multimodal_encoder.builder import build_vision_tower
+    with pytest.raises(FileNotFoundError,match='local assets'):
+        build_vision_tower(SimpleNamespace(mm_vision_tower='google/remote-siglip'))
+
+
+def test_implicit_device_maps_require_permission():
+    from runtime_policy import admit_placement
+    for mapping in ('auto', 'balanced', {'':0}, {'':'cuda:0'}):
+        with pytest.raises(PermissionError): admit_placement(mapping)
+    admit_placement({'':'cpu'})

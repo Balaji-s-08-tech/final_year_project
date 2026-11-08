@@ -3,6 +3,8 @@ import os
 
 def build_vision_tower(vision_tower_cfg, **kwargs):
     vision_tower = getattr(vision_tower_cfg, 'mm_vision_tower', getattr(vision_tower_cfg, 'vision_tower', None))
+    from runtime_policy import require_local_asset
+    vision_tower = require_local_asset(vision_tower)
     use_s2 = getattr(vision_tower_cfg, 'use_s2', False)
 
     if 'sig' in vision_tower.lower():

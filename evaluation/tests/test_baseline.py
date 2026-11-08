@@ -123,7 +123,7 @@ def test_invalid_config(tiny_bunny, changes):
 
 
 def test_read_only_preflight_and_gpu_gate(tiny_bunny, tmp_path, monkeypatch):
-    config = replace(tiny_bunny, device="cuda:0", dtype="float16", required_free_ram_bytes=10, required_free_vram_bytes=20)
+    config = replace(tiny_bunny, device="cuda:0", dtype="float16", required_free_ram_bytes=10, required_free_vram_bytes=20, dataset_split="fixture-heldout")
     monkeypatch.setattr(torch.cuda, "is_available", lambda: pytest.fail("Read-only preflight must not initialize CUDA"))
     report = preflight(config, environment={"ram": {"available_bytes": 100}, "cuda_runtime": "fixture-only", "gpu_devices": [{"available_memory_bytes": 30}]})
     assert report["status"] == "PREFLIGHT_ONLY" and report["memory_feasibility"] == "NOT_PROVEN"
@@ -245,3 +245,20 @@ def test_input_changes_and_unknown_treatment_cannot_pass(tiny_bunny, tmp_path, m
     with pytest.raises(ValueError, match="changed"):
         evaluate(tiny_bunny, tmp_path / "runs", adapter=ControlledAdapter())
     assert ExperimentStore(tmp_path / "runs").runs()[0].latest()["status"] == "FAILED"
+
+
+def test_split_and_explicit_hashing_configuration(tiny_bunny):
+    with pytest.raises(ValueError,match='split'):
+        replace(tiny_bunny,device='cuda:0',dtype='float16').validate()
+    with pytest.raises(ValueError,match='hash_large_assets'):
+        replace(tiny_bunny,hash_large_assets='yes').validate()
+    assert replace(tiny_bunny,dataset_split='fixture-heldout',hash_large_assets=True).validate()
+
+
+def test_dense_adapter_cannot_activate_quantized_backend(tiny_bunny):
+    path=Path(tiny_bunny.model_path)/'config.json'
+    config=json.loads(path.read_text()); config['quantization_config']={'load_in_4bit':True}
+    path.write_text(json.dumps(config))
+    assert compatibility(tiny_bunny)['errors']
+    with pytest.raises(ValueError,match='implicit'):
+        LocalAdapter().load(tiny_bunny)

@@ -29,6 +29,8 @@ class EvaluationConfig:
     required_free_ram_bytes: int | None = None
     required_free_vram_bytes: int | None = None
     schema_version: int = 1
+    dataset_split: str | None = None
+    hash_large_assets: bool = False
 
     def validate(self):
         if type(self.schema_version) is not int or self.schema_version != 1:
@@ -39,6 +41,12 @@ class EvaluationConfig:
         for key in ("model_identifier", "model_revision", "dataset_identifier", "dataset_revision"):
             if getattr(self, key).startswith("REPLACE_"):
                 raise ValueError(f"Replace the template placeholder for {key} before inspection/execution")
+        if self.dataset_split is not None and (not isinstance(self.dataset_split, str) or not self.dataset_split.strip() or self.dataset_split.startswith('REPLACE_')):
+            raise ValueError('Invalid or placeholder dataset_split')
+        if self.device.startswith('cuda') and self.dataset_split is None:
+            raise ValueError('GPU evaluation requires an explicit held-out split')
+        if type(self.hash_large_assets) is not bool:
+            raise ValueError('hash_large_assets must be boolean')
         if self.adapter not in {"bunny_phi", "portable_awq_text"}:
             raise ValueError("Unsupported adapter; architecture support is explicit")
         if self.device not in {"cpu", "cuda:0"} or self.dtype not in {"float32", "float16", "bfloat16"}:

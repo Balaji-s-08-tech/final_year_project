@@ -158,3 +158,12 @@ boundaries, and preserve the complete vision/projector path for all VLM treatmen
 Do not compare text-only portable AWQ scores with multimodal Bunny as equivalent.
 Start with a small dense baseline fit/forward/generation run after authorization,
 then inspect actual outputs before expanding to compression experiments.
+
+## Autonomous program follow-up
+The shared runtime policy now guards supported evaluator/AWQ/loader/backend/probe
+paths. Status polling is metadata-only. Legacy remote acquisition is rejected;
+GPU acknowledgement never authorizes model/data downloads or spending. dataset_split
+is explicit (required for GPU evaluation), and hash_large_assets=true deliberately
+hashes local large weights before and after loading; review that I/O budget rather
+than assuming default bounded hashes prove identity. See AUTONOMOUS_HANDOFF.md for
+current verified scope, CPU reproduction and final external prerequisites.
