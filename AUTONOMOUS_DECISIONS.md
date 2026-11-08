@@ -41,3 +41,11 @@ No seed-dependent random ranking; ties are stable. Reconstruction strict-loads a
 candidate copy. Risks: masks add storage; physical slicing changes quality and
 needs recovery; no latency claim. Validation: gradients, roundtrips and tiny
 complete multimodal interface on CPU.
+
+## Calibration storage and artifact inspection
+Slice before CPU transfer and clone bounded FP32 activation storage. FP16 feature
+retention was rejected because tiny values can disappear and full activation storage
+can survive via a view. Restore mixed training/cache state on exceptions. Require
+trusted pickle plus a bounded load budget for artifact verification; no hidden large
+model load. Tensor reconstruction error is separate from task quality. Validation:
+INT4/INT8 export/reload, hooks/modes failure recovery, tiny values and full suite.

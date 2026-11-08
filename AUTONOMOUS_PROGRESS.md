@@ -44,3 +44,14 @@ tiny real Bunny+SigLIP full forward/generation. Full suite: 259 passed, no failu
 or skips, one existing third-party warning. Changed compression/pruning.py, its
 tests and methodology. Attention/vision/projector physical pruning remains explicitly
 unsupported. No GPU/downloads/spending. Next: AWQ calibration and artifact verification.
+
+## Mission 5 — AWQ validation
+Mission 4 committed/pushed: 96de78367184f2f90a87e47dfa7d187aa8c705c1.
+Branch feat/mission-5-awq-validation. Fixed activation slice-before-transfer,
+FP32 bounded owned storage, exact calibration sample counts, mixed training-mode
+restoration and typed configuration validation. Added tensor error analysis and
+bounded trusted CPU export verification (inner/outer metadata, actual bits/groups,
+packing, scales and zero points). Five new tests; full suite 264 passed, no failures
+or skips, one existing warning. Real calibration/data quality remain Not measured.
+Changed AWQ config/calibration/summary, compression quantization utilities/tests and
+methodology. No GPU/downloads/spending. Next: consistent combined experiment suite.

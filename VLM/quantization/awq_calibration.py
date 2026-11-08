@@ -57,6 +57,8 @@ def load_calibration_text(source: str) -> List[str]:
 
 def build_calibration_samples(tokenizer, texts: Sequence[str], num_samples: int, sequence_length: int, seed: int) -> List[torch.Tensor]:
     """Tokenize a deterministic subset into one bounded sequence per sample."""
+    if type(num_samples) is not int or num_samples < 1 or type(sequence_length) is not int or sequence_length < 1:
+        raise ValueError("Positive integer calibration bounds are required")
     indices = list(range(len(texts)))
     random.Random(seed).shuffle(indices)
     samples: List[torch.Tensor] = []
@@ -67,16 +69,18 @@ def build_calibration_samples(tokenizer, texts: Sequence[str], num_samples: int,
             samples.append(input_ids)
         if len(samples) == num_samples:
             break
-    if not samples:
-        raise ValueError("Tokenization produced no calibration samples.")
+    if len(samples) != num_samples:
+        raise ValueError("Insufficient nonempty calibration samples; refusing a silent count change")
     return samples
 
 
 def _bounded_append(storage: List[torch.Tensor], value: torch.Tensor, remaining: int) -> int:
     if remaining <= 0:
         return 0
-    flat = value.detach().reshape(-1, value.shape[-1]).to(device="cpu", dtype=torch.float16)
-    kept = flat[:remaining].contiguous()
+    flat = value.detach().reshape(-1, value.shape[-1])
+    kept = flat[:remaining].to(device="cpu", dtype=torch.float32).contiguous().clone()
+    if not torch.isfinite(kept).all():
+        raise ValueError("Nonfinite calibration activations")
     if kept.numel():
         storage.append(kept)
     return remaining - kept.shape[0]
@@ -92,7 +96,7 @@ def collect_linear_inputs(
 ) -> Dict[str, torch.Tensor]:
     """Collect bounded input activations for selected linears on the current model.
 
-    Call this for one Phi decoder block at a time.  Hooks retain CPU FP16
+    Call this for one Phi decoder block at a time.  Hooks retain CPU FP32
     tensors only and are always removed, including when a model forward fails.
     """
     features: Dict[str, List[torch.Tensor]] = {name: [] for name in linears}
@@ -109,6 +113,7 @@ def collect_linear_inputs(
     old_cache = getattr(model.config, "use_cache", None)
     if old_cache is not None:
         model.config.use_cache = False
+    prior_modes = [(module, module.training) for module in model.modules()]
     model.eval()
     try:
         for input_ids in samples:
@@ -118,6 +123,8 @@ def collect_linear_inputs(
     finally:
         for handle in handles:
             handle.remove()
+        for module, mode in prior_modes:
+            module.training = mode
         if old_cache is not None:
             model.config.use_cache = old_cache
 

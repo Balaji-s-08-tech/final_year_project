@@ -25,6 +25,13 @@ class AWQConfig:
     pruning_ratio: Optional[float] = None
 
     def validate(self) -> None:
+        if type(self.authorize_gpu) is not bool:
+            raise ValueError("authorize_gpu must be boolean")
+        for field in ("bits", "group_size", "calibration_samples", "sequence_length", "max_tokens_per_linear", "scale_grid", "clip_grid", "seed"):
+            if type(getattr(self, field)) is not int:
+                raise ValueError(f"{field} must be an integer")
+        if self.seed < 0 or self.dtype not in {"float16", "float32", "bfloat16"}:
+            raise ValueError("Invalid seed/dtype")
         if self.bits not in (4, 8):
             raise ValueError("Only 4-bit and 8-bit weight-only AWQ are supported.")
         if self.group_size == 0 or self.group_size < -1:

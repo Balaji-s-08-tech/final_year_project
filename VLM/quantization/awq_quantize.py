@@ -276,7 +276,7 @@ def quantize_bunny_awq(model: nn.Module, samples: Sequence[torch.Tensor], config
     admit_model(model, config.authorize_gpu)
     blocks = _phi_blocks(model)
     model.to(device).eval()
-    result = {"architecture": "Bunny Phi-2", "blocks": len(blocks), "scaled_groups": 0, "clipped_linears": 0, "quantized_linears": 0}
+    result = {"architecture": "Bunny Phi-2", "blocks": len(blocks), "scaled_groups": 0, "clipped_linears": 0, "quantized_linears": 0, "calibration_activation_dtype": "float32", "effective_parameter_dtypes": sorted({str(p.dtype) for p in model.parameters()})}
     for index, block in enumerate(blocks):
         LOG.info("Calibrating and quantizing Phi block %d/%d", index + 1, len(blocks))
         linears = _block_linears(block)
