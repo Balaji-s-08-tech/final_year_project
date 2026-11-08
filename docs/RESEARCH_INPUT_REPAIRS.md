@@ -37,3 +37,32 @@ EOS/padding, invalid bounds, finite traversal, seeded subset selection, text-axi
 truncation, source immutability and downstream gradient propagation. No dataset
 recipe or accuracy-retention claim follows from these fixture tests. Legacy
 LLaVA/InternVL samplers and multi-GPU execution are not repaired in this increment.
+
+## Artifact headers and recovery state
+
+Hypothesis: reject ambiguous metadata and validate recovery tensors before copying
+any state so invalid inputs cannot silently create mislabeled or mixed-weight runs.
+
+Artifact metadata now requires an object, integer version/size (not booleans),
+supported format, lowercase SHA256, consistent precision/format/bits and object/null
+calibration data. Duplicate JSON keys, nonfinite JSON constants and headers over
+1 MiB are rejected. Discovery reports UNKNOWN for invalid metadata instead of an
+uncaught attribute/type error. Valid artifact contents are still hash-verified;
+this does not authenticate an external producer or prove internal tensor semantics.
+
+Explicit missing recovery paths raise FileNotFoundError immediately, rather than
+fall back to the pruned model and label the input as recovered. A full-state recovery
+file must cover the structured model's exact state keys with compatible tensor
+shapes/types and finite values that fit the destination dtype. Prevalidation occurs
+before load_state_dict; copying one matching tensor is no longer accepted as a
+full recovery. Partial LoRA adapter handling is separate and is not forced into the
+full-state contract. Raw serialized objects and all reconstructed recovery inputs
+are marked recovery_provenance=UNVERIFIED; complete tensor coverage does not prove
+that training occurred on the claimed pruning/data revision.
+
+This deliberately rejects formerly accepted partial full-state files. Legacy
+builder initialization, adapter/non-LoRA state completeness and a content-bound
+recovery training manifest remain future work. In particular, a full multimodal
+state may need its vision modules initialized before strict loading; no fallback
+to partial copying is provided. Serialized files must remain trusted; no attempt
+is made to sandbox Python pickle execution.

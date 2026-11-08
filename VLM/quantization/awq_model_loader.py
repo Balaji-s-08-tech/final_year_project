@@ -36,10 +36,23 @@ def _load_recovery_state(model, recovery_checkpoint: Path) -> None:
         state = state["model"].state_dict()
     if not isinstance(state, dict) or not all(isinstance(key, str) for key in state):
         raise ValueError("Recovery checkpoint must contain a model state dictionary or a {'model': module} payload.")
-    incompatible = model.load_state_dict(state, strict=False)
-    loaded = len(state) - len(incompatible.unexpected_keys)
-    if loaded <= 0:
-        raise RuntimeError("No recovery tensors matched the structured Bunny model; refusing to quantize base weights.")
+    expected = model.state_dict()
+    missing, unexpected = sorted(set(expected) - set(state)), sorted(set(state) - set(expected))
+    if missing or unexpected:
+        raise RuntimeError(f"Recovery must cover the full structured state; missing={missing}, unexpected={unexpected}")
+    # Validate the entire payload before load_state_dict can partially mutate a
+    # model and only then discover a later shape mismatch/nonfinite tensor.
+    for name, tensor in state.items():
+        if not torch.is_tensor(tensor) or tensor.shape != expected[name].shape:
+            raise ValueError(f"Recovery tensor shape/type mismatch: {name}")
+        if (tensor.is_floating_point() or tensor.is_complex()) and not torch.isfinite(tensor).all():
+            raise ValueError(f"Nonfinite recovery tensor: {name}")
+        target = expected[name]
+        if tensor.is_complex() != target.is_complex() or tensor.is_floating_point() != target.is_floating_point():
+            raise ValueError(f"Recovery tensor numeric type mismatch: {name}")
+        if tensor.is_floating_point() and tensor.numel() and tensor.abs().max() > torch.finfo(target.dtype).max:
+            raise ValueError(f"Recovery tensor overflows target dtype: {name}")
+    model.load_state_dict(state, strict=True)
 
 
 def load_bunny_recovered_model(
@@ -57,6 +70,8 @@ def load_bunny_recovered_model(
     checkpoint.  This function enforces that invariant.
     """
     _enable_project_imports()
+    if recovery_checkpoint is not None and not Path(recovery_checkpoint).exists():
+        raise FileNotFoundError(f"Explicit recovery checkpoint is unavailable: {recovery_checkpoint}")
     selected = Path(recovery_checkpoint or pruned_checkpoint or "")
     if selected.is_file():
         payload = _torch_load(selected)
@@ -67,7 +82,8 @@ def load_bunny_recovered_model(
                 raise ValueError("Structured checkpoint has no tokenizer. Supply a compatible checkpoint with tokenizer metadata.")
             model.to(device)
             model.eval()
-            return tokenizer, model, {"source_format": "serialized_structured_model", "source": str(selected)}
+            return tokenizer, model, {"source_format": "serialized_structured_model", "source": str(selected),
+                                      "recovery_provenance": "UNVERIFIED", "warning": "A serialized model does not establish training/recovery lineage"}
 
     if not base_model or not pruned_checkpoint:
         raise ValueError(
@@ -95,6 +111,8 @@ def load_bunny_recovered_model(
         "base_model": base_model,
         "pruned_checkpoint": str(prune_path),
         "recovery_checkpoint": recovery_checkpoint,
+        "recovery_state_coverage": "COMPLETE" if recovery_checkpoint and Path(recovery_checkpoint).is_file() else None,
+        "recovery_provenance": "UNVERIFIED",
     }
 
 

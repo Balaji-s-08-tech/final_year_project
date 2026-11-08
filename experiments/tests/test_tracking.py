@@ -271,7 +271,8 @@ def test_cli_awq_failure_is_retained_without_model_download(tmp_path):
     assert result.returncode != 0
     runs = ExperimentStore(tmp_path / "output" / "experiments").runs()
     assert len(runs) == 1 and runs[0].latest()["status"] == "FAILED"
-    assert "ValueError" in (runs[0].path / "stderr.log").read_text()
+    assert "FileNotFoundError" in (runs[0].path / "stderr.log").read_text()
+    assert "Explicit recovery checkpoint is unavailable" in runs[0].latest()["error"]
 
 
 def test_documented_schemas_and_roundtrip(store):

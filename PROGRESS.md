@@ -66,3 +66,18 @@ skipped, one third-party warning. The algorithm has not been run on full Bunny.
 See docs/RESEARCH_INPUT_REPAIRS.md for contract corrections and remaining limits.
 Next independent task: malformed/stale artifact metadata and recovery-state
 validation before model mutation.
+
+Sampler repair commit: `09cbef69a4e264a1623276e129e0933a15bbfea2`, pushed on
+fix/research-input-validation-004, stacked above Mission 3.
+
+### Metadata and recovery validation increment
+
+219 CPU tests passed (26 new validation cases), none failed or skipped, one
+third-party warning. An existing failure-log regression was updated to require
+the new, precise FileNotFoundError for explicit missing recovery paths, while
+still verifying durable FAILED status and logs. Malformed artifact JSON cannot
+escape discovery as attribute/type errors. Incomplete, malformed, nonfinite or
+overflowing recovery state is rejected before parameter copies. Raw/reconstructed
+inputs explicitly retain UNVERIFIED recovery provenance; no training claim is made.
+Next bounded task: remove obsolete A100 admission defaults and require explicit
+authorization before the old model/GPU probe can initialize a CUDA context.
