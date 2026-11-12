@@ -1,5 +1,16 @@
 # VLM Compression Optimizer
 
+## Final-year demonstration delivery
+
+Start with [DEMO_README.md](DEMO_README.md) for the offline React presentation and
+optional image-question API. The [engineering status](FINAL_ENGINEERING_STATUS.md)
+records current validation. Declarative safetensors treatments now connect dense,
+pruned, recovered and packed language blocks to the complete Bunny multimodal
+adapter. [GPU execution](GPU_EXECUTION_GUIDE.md) and
+[artifact contracts](MODEL_ARTIFACT_MANIFEST.md) describe the supported path.
+The older milestone records below remain historical evidence; no real GPU or
+pretrained-model research results are claimed by the new integration.
+
 A CPU-validated research engineering framework for Bunny/Phi-2 with a SigLIP vision
 encoder. The research question is whether structured pruning, sparsity and AWQ can
 improve the quality/resource trade-off under controlled evaluation. No real model

@@ -1,0 +1,18 @@
+# Install a reviewed CUDA-enabled torch/torchvision pair separately.
+# These versions match the CPU-validated Python integration dependencies.
+numpy==1.26.4
+transformers==4.37.2
+tokenizers==0.15.2
+accelerate==0.28.0
+peft==0.10.0
+timm==0.9.12
+einops==0.6.1
+einops-exts==0.0.4
+sentencepiece==0.2.3
+fastapi==0.115.12
+starlette==0.46.2
+httpx==0.28.1
+psutil==7.2.2
+PyYAML==6.0.3
+pytest==9.2.0
+uvicorn==0.54.0
