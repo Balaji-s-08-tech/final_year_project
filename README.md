@@ -30,6 +30,12 @@ dequantize in PyTorch. Real research checkpoints and held-out assets are absent.
 
 ## CPU development
 
+For a fresh Python 3.12 CPU environment, use `requirements-cpu-dev.txt` and the
+commands in [Local GPU execution guide](LOCAL_GPU_EXECUTION_GUIDE.md). The guide
+records verified CPU commands and the remaining full-model GPU prerequisites.
+`python -m compression --with-recovery --output checkpoints/synthetic_experiments`
+also exercises bounded synthetic MLP+LoRA and MLP+LoRA+INT4 treatments.
+
 Use Python 3.11 and the prepared `.venv-vlm-awq` environment. The installed Linux CPU
 versions are recorded in `requirements-cpu.lock`; this is a version lock, not a
 wheel-hash lock or a CUDA environment. Fresh dependency installation requires normal
