@@ -114,5 +114,6 @@ def recover_lora(source, batches, config=RecoveryConfig()):
             losses.append(float(loss.detach()))
         validate_state(model)
         model.eval()
+    evidence = 'CPU_FIXTURE_RECOVERY_ONLY' if getattr(source.config, 'weight_origin', None) == 'SYNTHETIC_TEST' else 'LOCAL_CPU_RECOVERY_QUALITY_UNVERIFIED'
     return model, {'configuration': asdict(config), 'losses': losses,
-                   'evidence': 'CPU_FIXTURE_RECOVERY_ONLY', 'research_quality': 'NOT_MEASURED'}
+                   'evidence': evidence, 'research_quality': 'NOT_MEASURED'}

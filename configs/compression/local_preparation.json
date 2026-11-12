@@ -1,0 +1,7 @@
+{
+  "stages": ["dense", "prune", "recover", "awq"],
+  "max_model_bytes": 34359738368,
+  "calibration_data": "./calibration.txt",
+  "recovery_batches": "./recovery-batches.json",
+  "evaluate": false
+}
