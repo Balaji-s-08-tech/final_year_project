@@ -98,6 +98,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const apiService = {
+  demoModels: () => request<{models: {id:string;treatment:string;model_identifier:string;model_revision:string;images:{id:string;question:string}[]}[]}>('/api/demo/models'),
+  demoInference: (payload: Record<string, unknown>) => request<Record<string, unknown>>('/api/demo/inference', {method:'POST',body:JSON.stringify(payload)}),
   baseUrl: apiBaseUrl,
   health: () => request<BackendHealth>('/api/health'),
   system: () => request<SystemInfo>('/api/system/info'),

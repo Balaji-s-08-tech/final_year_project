@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ResearchDemo } from './components/demo/ResearchDemo';
 import { Activity, AlertTriangle, CheckCircle2, Cpu, HardDrive, Play, RefreshCw, Square, Terminal } from 'lucide-react';
 import { Sidebar, NavView } from './components/navigation/Sidebar';
 import { TerminalViewer } from './components/common/TerminalViewer';
@@ -8,6 +9,11 @@ const byteSize = (value?: number | null) => value == null ? 'NOT MEASURED' : `${
 const percent = (value?: number | null, total?: number | null) => value == null || total == null || total === 0 ? 'NOT MEASURED' : `${(value / total * 100).toFixed(1)}%`;
 
 export default function App() {
+  const [demo, setDemo] = useState(window.location.hash !== '#console');
+  return demo ? <ResearchDemo onConsole={() => {window.location.hash='console';setDemo(false);}} /> : <><button className="fixed bottom-3 right-3 z-50 bg-cyan-900 text-white rounded p-2" onClick={() => {window.location.hash='demo';setDemo(true);}}>Research demo</button><ResearchConsole /></>;
+}
+
+function ResearchConsole() {
   const [view, setView] = useState<NavView>('dashboard');
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);

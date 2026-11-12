@@ -1,0 +1,96 @@
+{
+  "evidence": "MEASURED_RANDOM_CPU_TEXT_FIXTURE_ONLY",
+  "warning": "Not Bunny-3B research results. Duration includes compression and fixture evaluation; it is not inference latency. Serialized container size is not deployment size.",
+  "rows": [
+    {
+      "treatment": "dense",
+      "parameters": 2752,
+      "artifact_bytes": 35412,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.014046036999843636,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "unstructured",
+      "parameters": 2752,
+      "artifact_bytes": 37838,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.013203605999933643,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "structured_mlp",
+      "parameters": 2488,
+      "artifact_bytes": 34900,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.012230538000039815,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "awq_int4",
+      "parameters": 2752,
+      "artifact_bytes": 33328,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.1158222870001282,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "awq_int8",
+      "parameters": 2752,
+      "artifact_bytes": 34352,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.11249731899988547,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "unstructured_awq",
+      "parameters": 2752,
+      "artifact_bytes": 34096,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.119224382000084,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "structured_awq",
+      "parameters": 2488,
+      "artifact_bytes": 33520,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.12411391099999491,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "structured_lora",
+      "parameters": 2488,
+      "artifact_bytes": 36052,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.04876942200007761,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    },
+    {
+      "treatment": "structured_lora_awq",
+      "parameters": 2488,
+      "artifact_bytes": 34608,
+      "accuracy": 0,
+      "preparation_and_eval_seconds": 0.13251940600002854,
+      "vram_bytes": null,
+      "source_commit": "892adaf2d40f436866a44aba11b27843798a935e",
+      "source_dirty": true
+    }
+  ]
+}

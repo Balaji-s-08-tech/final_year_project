@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
+    "test:demo": "node tests/demo.browser.cjs",
     "clean": "node -e \"import('node:fs').then(({rmSync}) => ['dist', 'server.js'].forEach(path => rmSync(path, {recursive: true, force: true})))\"",
     "lint": "tsc --noEmit"
   },
@@ -24,13 +25,14 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "playwright": "1.62.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
-    "@types/express": "^4.17.21"
+    "vite": "^6.2.3"
   }
 }
