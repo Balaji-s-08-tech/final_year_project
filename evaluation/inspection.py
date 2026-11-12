@@ -44,7 +44,7 @@ def local_checkpoint(path):
 
 def compatibility(config):
     errors, warnings = [], []
-    if config.adapter == "bunny_phi" and config.treatment != "baseline":
+    if config.adapter == "bunny_phi" and config.treatment != "baseline" and not config.treatment_artifact_path:
         errors.append("Dense Bunny adapter currently validates original baseline only; compressed/recovered lineage needs a separate bridge")
     if config.adapter == "portable_awq_text":
         path = Path(config.model_path)

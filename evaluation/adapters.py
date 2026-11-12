@@ -30,6 +30,8 @@ class Adapter(Protocol):
 
 class LocalAdapter:
     def load(self, config):
+        if config.adapter == 'bunny_phi' and config.treatment != 'baseline' and not config.treatment_artifact_path:
+            raise ValueError('Compressed Bunny treatment requires verified treatment artifact')
         from runtime_policy import admit_device
         admit_device(config.device, getattr(self, "authorize_gpu", False))
         self.config = config
@@ -73,7 +75,7 @@ class LocalAdapter:
             model_config.continuous_training = False
             self.tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, trust_remote_code=False)
             self.model, loading = BunnyPhiForCausalLM.from_pretrained(local, config=model_config, local_files_only=True,
-                torch_dtype=getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True, use_safetensors=True if not config.trusted_checkpoint else None)
+                torch_dtype=torch.float32 if config.treatment_artifact_path else getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True, use_safetensors=True if not config.trusted_checkpoint else None)
             missing = [k for k in loading["missing_keys"] if "vision_tower" not in k]
             if missing or loading.get("mismatched_keys") or loading.get("unexpected_keys"):
                 raise ValueError(f"Checkpoint tensor compatibility failed: {loading}")
@@ -83,6 +85,10 @@ class LocalAdapter:
             if not tower.is_loaded:
                 tower.load_model()
             self.processor = tower.image_processor
+            self.treatment_identity = None
+            if config.treatment_artifact_path:
+                from compression.multimodal import apply_treatment
+                self.treatment_identity = apply_treatment(self, config.treatment_artifact_path, max_bytes=config.max_treatment_bytes)
             self.model.to(device=config.device, dtype=getattr(torch, config.dtype))
         from evaluation.integrity import validate_state, guard_logits
         validate_state(self.model)
@@ -96,6 +102,7 @@ class LocalAdapter:
         from transformers import GenerationConfig
         self.generation_settings = GenerationConfig.from_dict(self.model.generation_config.to_dict())
         self.generation_settings.update(max_new_tokens=self.config.max_new_tokens, do_sample=False, num_beams=1, use_cache=True, pad_token_id=self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id)
+        self.asset_verification['treatment'] = getattr(self, 'treatment_identity', None)
         from evaluation.inference_policy import validate_generation
         validate_generation(self.generation_settings.to_dict())
         return {"asset_verification": self.asset_verification, "weight_origin": self.weight_origin, "pretrained_identity": "UNVERIFIED; local loading coverage is not acquisition provenance", "generation": self.generation_settings.to_dict(), "model": self.model.config.to_dict(), "tokenizer": {"class": type(self.tokenizer).__name__, "name": self.tokenizer.name_or_path}, "processor": self.processor.to_dict() if hasattr(self, "processor") else None}

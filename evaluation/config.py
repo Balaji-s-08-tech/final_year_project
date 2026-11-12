@@ -35,8 +35,14 @@ class EvaluationConfig:
     hash_large_assets: bool = False
     model_manifest_path: str | None = None
     vision_manifest_path: str | None = None
+    treatment_artifact_path: str | None = None
+    max_treatment_bytes: int = 64 * 1024 * 1024
 
     def validate(self):
+        if type(self.max_treatment_bytes) is not int or self.max_treatment_bytes < 1:
+            raise ValueError('Explicit positive treatment load budget required')
+        if self.treatment_artifact_path and self.adapter != 'bunny_phi':
+            raise ValueError('Multimodal treatment requires Bunny adapter')
         if type(self.schema_version) is not int or self.schema_version != 1:
             raise ValueError("Unsupported evaluation schema version")
         for key in ("model_path", "model_identifier", "model_revision", "dataset_path", "dataset_identifier", "dataset_revision", "prompt_template"):
@@ -89,7 +95,7 @@ class EvaluationConfig:
         data = read_json(path)
         if not isinstance(data, dict) or set(data) - {f.name for f in fields(cls)}:
             raise ValueError("Configuration must be an object with known fields")
-        for key in ("model_path", "dataset_path", "vision_path", "model_manifest_path", "vision_manifest_path"):
+        for key in ("model_path", "dataset_path", "vision_path", "model_manifest_path", "vision_manifest_path", "treatment_artifact_path"):
             if data.get(key):
                 data[key] = str((path.parent / data[key]).resolve())
         return cls(**data).validate()

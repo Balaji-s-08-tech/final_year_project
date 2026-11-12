@@ -25,6 +25,8 @@ app = FastAPI(title="VLM Compression Research API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=[FRONTEND_ORIGIN], allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
 from backend.admission import RequestAdmission
 app.add_middleware(RequestAdmission)
+from backend.demo import router as demo_router
+app.include_router(demo_router)
 jobs = JobManager()
 IMPORTED_RESULTS_ROOT = OUTPUT_ROOT / "imported_results"
 

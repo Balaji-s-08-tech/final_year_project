@@ -6,7 +6,7 @@ from experiments.assets import inventories, DEFAULT_ASSET_LIMITS
 
 def asset_manifest(config, *, limits=DEFAULT_ASSET_LIMITS):
     manifest = {}
-    sources = [(region, source) for region, source in (("model", config.model_path), ("encoder", config.vision_path))]
+    sources = [(region, source) for region, source in (("model", config.model_path), ("encoder", config.vision_path), ('treatment', getattr(config, 'treatment_artifact_path', None)))]
     discovered = iter(inventories([source for _, source in sources if source], hash_large=getattr(config, "hash_large_assets", False), limits=limits))
     for region, source in sources:
         if not source:

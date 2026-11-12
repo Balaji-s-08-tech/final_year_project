@@ -115,8 +115,10 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
             add("baseline_accuracy" if config.treatment == "baseline" else "compressed_accuracy", correct / len(predictions), "normalized_exact_match_v1", {"sample_ids": [r["id"] for r in predictions]})
             add("original_parameter_count" if config.treatment == "baseline" else "remaining_parameter_count", layout["logical_parameter_elements"], "unique_registered_parameters_plus_logical_packed_weights")
             sizes = [report.get("model", {}).get("artifact_bytes"), (report.get("vision") or {}).get("artifact_bytes")]
+            if config.treatment_artifact_path:
+                sizes.append((Path(config.treatment_artifact_path) / 'blocks.safetensors').stat().st_size)
             if sizes[0] is not None:
-                add("original_model_size" if config.treatment == "baseline" else "compressed_model_size", sum(s for s in sizes if s is not None), "model_and_vision_weight_files_stat")
+                add("original_model_size" if config.treatment == "baseline" else "compressed_model_size", sum(s for s in sizes if s is not None), "base_vision_and_treatment_dependency_bytes" if config.treatment_artifact_path else "model_and_vision_weight_files_stat")
             if config.device.startswith("cuda"):
                 add("peak_gpu_memory", torch.cuda.max_memory_allocated(config.device), "cuda_peak_allocated_including_load_warmup_eval",
                     {"peak_reserved_bytes": torch.cuda.max_memory_reserved(config.device)})
