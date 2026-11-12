@@ -2,6 +2,12 @@
 
 ## Final-year demonstration delivery
 
+A user-supplied Kaggle/T4 dense GPU smoke succeeded with pinned Bunny/SigLIP assets.
+See [baseline reproduction](BUNNY_GPU_BASELINE_REPRODUCTION.md) and
+[evidence review](docs/reports/BUNNY_GPU_BASELINE_EVIDENCE.md). Its red-square answer
+identified red while whole-answer exact match remained 0/1. This supports smoke
+execution, not benchmark accuracy or compressed-model validation.
+
 Start with [DEMO_README.md](DEMO_README.md) for the offline React presentation and
 optional image-question API. The [engineering status](FINAL_ENGINEERING_STATUS.md)
 records current validation. Declarative safetensors treatments now connect dense,
@@ -13,8 +19,9 @@ pretrained-model research results are claimed by the new integration.
 
 A CPU-validated research engineering framework for Bunny/Phi-2 with a SigLIP vision
 encoder. The research question is whether structured pruning, sparsity and AWQ can
-improve the quality/resource trade-off under controlled evaluation. No real model
-quality, GPU fit, recovery success or inference speedup has been established.
+improve the quality/resource trade-off under controlled evaluation. Full benchmark
+quality, recovery success, compression speedups and fit beyond the reported dense
+smoke profile remain unverified.
 
 Start with [AUTONOMOUS_HANDOFF.md](AUTONOMOUS_HANDOFF.md) for the complete scope,
 reproduction steps, branch inventory and external prerequisites. Progress and

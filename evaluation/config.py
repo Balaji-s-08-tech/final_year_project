@@ -37,8 +37,11 @@ class EvaluationConfig:
     vision_manifest_path: str | None = None
     treatment_artifact_path: str | None = None
     max_treatment_bytes: int = 64 * 1024 * 1024
+    evaluation_purpose: str = 'benchmark'
 
     def validate(self):
+        if self.evaluation_purpose not in {'benchmark', 'smoke_test'}:
+            raise ValueError('Unsupported evaluation purpose')
         if type(self.max_treatment_bytes) is not int or self.max_treatment_bytes < 1:
             raise ValueError('Explicit positive treatment load budget required')
         if self.treatment_artifact_path and self.adapter != 'bunny_phi':

@@ -22,8 +22,9 @@ def nearest_rank(values, percentile):
 
 
 def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_gpu=False):
-    from runtime_policy import admit_device
+    from runtime_policy import admit_device, prepare_deterministic_cuda
     admit_device(config.device, authorize_gpu)
+    prepare_deterministic_cuda(config.device)
     config.validate()
     if config.device.startswith("cuda") and not authorize_gpu:
         raise PermissionError("GPU execution requires separate explicit authorization; preflight is read-only")
@@ -38,7 +39,8 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                  "fingerprint": report["dataset"]["fingerprint"], "evaluation": {"scorer": "normalized_exact_match_v1", "prompt_template": config.prompt_template,
                  "sample_ids": report["dataset"]["sample_ids"], "split": config.dataset_split,
                  "max_input_tokens": config.max_input_tokens, "max_new_tokens": config.max_new_tokens}},
-        source_paths=["evaluation/config.py", "evaluation/runner.py", "evaluation/adapters.py", "evaluation/data.py"])
+        source_paths=["evaluation/config.py", "evaluation/runner.py", "evaluation/adapters.py", "evaluation/data.py",
+                      "evaluation/checkpoint_layout.py", "runtime_policy.py"])
     write_json(run.path / "assets.json", assets)
     write_json(run.path / "preflight.json", report)
     run.transition("RUNNING")
@@ -47,6 +49,10 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
         with record_output(run):
             if report["errors"]:
                 raise ValueError("Preflight blocked: " + "; ".join(report["errors"]))
+            import os
+            write_json(run.path / 'execution_policy.json', {'evaluation_purpose': config.evaluation_purpose,
+                'cublas_workspace_config': os.environ.get('CUBLAS_WORKSPACE_CONFIG') if config.device.startswith('cuda') else None,
+                'deterministic_algorithms_requested': True})
             examples, fingerprint = load_examples(config)
             if fingerprint != report["dataset"]["fingerprint"]:
                 raise ValueError("Evaluation inputs changed after preflight")
@@ -63,6 +69,8 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                 if isinstance(active, LocalAdapter):
                     active.authorize_gpu = authorize_gpu
                 active.load(config)
+                if hasattr(active, 'loading_report'):
+                    write_json(run.path / 'checkpoint_loading.json', active.loading_report)
                 write_json(run.path / "effective_inference.json", active.effective() if hasattr(active, "effective") else {"status": "UNAVAILABLE_SYNTHETIC_ADAPTER"})
                 if asset_manifest(config) != assets:
                     raise ValueError("Model/encoder assets changed during loading")
@@ -131,7 +139,14 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
                     raise ValueError("Mixed packed bit widths are not a controlled treatment")
                 quantization = {"method": "AWQ", "bits": layout["packed_bits"][0], "calibration": None}
             write_json(run.path / "evaluation_summary.json", {"samples": len(predictions), "correct": correct, "generated_tokens": total_tokens,
-                "scorer": "normalized_exact_match_v1", "warnings": ["Exact match is not an official VQA scorer", "No optimization benefit is established by a single run"]})
+                "scorer": "normalized_exact_match_v1", 'evaluation_purpose': config.evaluation_purpose,
+                'score_interpretation': 'DIAGNOSTIC_ONLY' if config.evaluation_purpose == 'smoke_test' else 'EXACT_MATCH_ONLY',
+                "warnings": ["Exact match is not an official VQA scorer", "A phrasing mismatch can score zero despite identifying the correct concept", "No optimization benefit is established by a single run"]})
+            if config.evaluation_purpose == 'smoke_test':
+                write_json(run.path / 'smoke_test_summary.json', {'status': 'PASSED_EXECUTION',
+                    'checks': ['model_loaded', 'inputs_prepared', 'finite_generation', 'nonempty_generated_tokens'],
+                    'semantic_answer_correctness': 'NOT_AUTOMATICALLY_ASSESSED',
+                    'benchmark_validity': 'NOT_ESTABLISHED', 'samples': len(predictions)})
         run.transition("COMPLETED", metrics=benchmark(metrics, quantization=quantization), artifacts=[str(p) for p in sorted(run.path.glob("predictions/*.json"))])
         return run
     except BaseException as exc:

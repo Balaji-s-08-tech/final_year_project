@@ -1,5 +1,10 @@
 # Portable local CUDA execution
 
+For the now-supplied successful dense T4 smoke and reviewed loader fixes, use
+[BUNNY_GPU_BASELINE_REPRODUCTION.md](BUNNY_GPU_BASELINE_REPRODUCTION.md).
+It pins both checkpoints, configures deterministic cuBLAS, and reviews memory
+before any compression. The earlier delivery's lack of a GPU rerun remains true.
+
 Supported target: an already authorized NVIDIA L4 24 GB or another local CUDA
 machine with measured adequate RAM, VRAM and disk. No GPU was used during this
 delivery. A 24 GB card is a target, not proof of fit; 6 GB is not assumed sufficient.

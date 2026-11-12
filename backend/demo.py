@@ -66,9 +66,10 @@ class DemoService:
         try:
             import torch
             from evaluation.adapters import LocalAdapter
-            from runtime_policy import admit_device
+            from runtime_policy import admit_device, prepare_deterministic_cuda
             authorized = os.environ.get('VLM_DEMO_ALLOW_GPU') == '1'
             admit_device(config.device, authorized)
+            prepare_deterministic_cuda(config.device)
             if config.device.startswith('cuda'):
                 from evaluation.preflight import preflight
                 report = preflight(config)

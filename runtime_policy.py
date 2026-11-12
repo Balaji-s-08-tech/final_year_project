@@ -1,4 +1,21 @@
 """Local device admission only; never provisions infrastructure or grants billing permission."""
+def prepare_deterministic_cuda(device):
+    """Configure cuBLAS before first CUDA use, without initializing CUDA."""
+    if not str(device).startswith('cuda'):
+        return None
+    import os
+    import torch
+    value = os.environ.get('CUBLAS_WORKSPACE_CONFIG')
+    if value is None:
+        if torch.cuda.is_initialized():
+            raise RuntimeError('CUDA is already initialized without CUBLAS_WORKSPACE_CONFIG; restart with :4096:8 before CUDA initialization')
+        value = ':4096:8'
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = value
+    if value not in {':4096:8', ':16:8'}:
+        raise ValueError('Deterministic CUDA requires CUBLAS_WORKSPACE_CONFIG=:4096:8 or :16:8 before CUDA initialization')
+    return value
+
+
 def admit_device(device: str, authorized: bool = False) -> str:
     if not isinstance(device, str) or not (device in {"cpu", "auto", "cuda"} or device.startswith("cuda:")):
         raise ValueError("Unsupported local device")

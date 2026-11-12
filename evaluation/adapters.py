@@ -32,8 +32,9 @@ class LocalAdapter:
     def load(self, config):
         if config.adapter == 'bunny_phi' and config.treatment != 'baseline' and not config.treatment_artifact_path:
             raise ValueError('Compressed Bunny treatment requires verified treatment artifact')
-        from runtime_policy import admit_device
+        from runtime_policy import admit_device, prepare_deterministic_cuda
         admit_device(config.device, getattr(self, "authorize_gpu", False))
+        prepare_deterministic_cuda(config.device)
         self.config = config
         self.asset_verification = {}
         from VLM.quantization.awq_model_loader import _enable_project_imports
@@ -76,14 +77,15 @@ class LocalAdapter:
             self.tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, trust_remote_code=False)
             self.model, loading = BunnyPhiForCausalLM.from_pretrained(local, config=model_config, local_files_only=True,
                 torch_dtype=torch.float32 if config.treatment_artifact_path else getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True, use_safetensors=True if not config.trusted_checkpoint else None)
-            missing = [k for k in loading["missing_keys"] if "vision_tower" not in k]
-            if missing or loading.get("mismatched_keys") or loading.get("unexpected_keys"):
-                raise ValueError(f"Checkpoint tensor compatibility failed: {loading}")
             tower = self.model.get_vision_tower()
             if tower is None:
                 raise ValueError("Checkpoint has no vision tower")
             if not tower.is_loaded:
                 tower.load_model()
+            from evaluation.checkpoint_layout import validate_bunny_checkpoint
+            self.loading_report = {'bunny': validate_bunny_checkpoint(local, self.model, loading),
+                                   'siglip': tower.layout_verification}
+            self.asset_verification['checkpoint_loading'] = self.loading_report
             self.processor = tower.image_processor
             self.treatment_identity = None
             if config.treatment_artifact_path:
