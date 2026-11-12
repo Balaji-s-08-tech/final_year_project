@@ -101,7 +101,7 @@ def prune(model, config=PruningConfig()):
     if config.method == 'magnitude_mask':
         masks = {name: torch.ones_like(module.weight, dtype=torch.bool) for name, module in selected.items()}
         if config.distribution == 'global':
-            scores = torch.cat([m.weight.detach().abs().float().flatten() for m in selected.values()])
+            scores = torch.cat([m.weight.detach().to(torch.float64).abs().flatten() for m in selected.values()])
             order = torch.argsort(scores, stable=True)[:int(scores.numel() * config.sparsity)]
             combined = torch.ones_like(scores, dtype=torch.bool); combined[order] = False
             offset = 0
@@ -122,7 +122,7 @@ def prune(model, config=PruningConfig()):
         for index, block in enumerate(model.model.layers):
             a, b = block.mlp.fc1, block.mlp.fc2
             remove = int(a.out_features * config.sparsity)
-            score = a.weight.detach().abs().mean(1) + b.weight.detach().abs().mean(0)
+            score = a.weight.detach().to(torch.float64).abs().mean(1) + b.weight.detach().to(torch.float64).abs().mean(0)
             keep = torch.argsort(score, stable=True)[remove:].sort().values
             block.mlp.fc1 = _slice(a, keep, torch.arange(a.in_features))
             block.mlp.fc2 = _slice(b, torch.arange(b.out_features), keep)

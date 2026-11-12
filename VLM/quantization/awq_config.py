@@ -40,7 +40,7 @@ class AWQConfig:
             raise ValueError("Calibration sample count and sequence length must be positive.")
         if self.max_tokens_per_linear < 1 or self.scale_grid < 1 or self.clip_grid < 1:
             raise ValueError("Calibration/token/grid settings must be positive.")
-        if not 0.0 < self.max_clip_shrink <= 1.0:
+        if type(self.max_clip_shrink) not in (int, float) or not 0.0 < self.max_clip_shrink <= 1.0:
             raise ValueError("max_clip_shrink must be in (0, 1].")
 
     def to_dict(self) -> Dict[str, Any]:

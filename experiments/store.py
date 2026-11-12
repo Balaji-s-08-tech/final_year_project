@@ -1,6 +1,5 @@
 """Exclusive atomic publication and append-only lifecycle revisions on local POSIX disks."""
 import contextlib
-import fcntl
 import json
 import os
 import re
@@ -11,6 +10,7 @@ from pathlib import Path
 
 from experiments.provenance import canonical_hash, capture
 from experiments.schema import benchmark, validate_benchmark
+from experiments.filesystem import exclusive_lock, sync_directory
 
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 TRANSITIONS = {"CREATED": {"QUEUED", "RUNNING", "FAILED", "CANCELLED"}, "QUEUED": {"RUNNING", "FAILED", "CANCELLED"}, "RUNNING": TERMINAL}
@@ -31,11 +31,7 @@ def publish(path, writer):
             stream.flush()
             os.fsync(stream.fileno())
         os.link(temporary, path)  # Atomic no-replace; competing publication fails.
-        directory = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        sync_directory(path.parent)
     finally:
         os.unlink(temporary)
 
@@ -60,8 +56,7 @@ class Run:
 
     @contextlib.contextmanager
     def lock(self):
-        with (self.path / ".lock").open("a") as stream:
-            fcntl.flock(stream, fcntl.LOCK_EX)
+        with exclusive_lock(self.path / ".lock"):
             yield
 
     def latest(self):
@@ -155,11 +150,7 @@ class ExperimentStore:
         for filename in ("execution.log", "stdout.log", "stderr.log"):
             publish(staging / filename, lambda stream: None)
         os.rename(staging, destination)
-        parent = os.open(destination.parent, os.O_RDONLY)
-        try:
-            os.fsync(parent)
-        finally:
-            os.close(parent)
+        sync_directory(destination.parent)
         return Run(destination)
 
     def runs(self, *, max_records=1000, max_entries=10000):
