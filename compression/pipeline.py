@@ -17,6 +17,7 @@ from experiments.store import ExperimentStore, write_json, publish, read_json
 from runtime_policy import admit_model, admit_device
 
 TREATMENTS=('dense','unstructured','structured_mlp','awq_int4','awq_int8','unstructured_awq','structured_awq')
+RECOVERY_TREATMENTS=('structured_lora','structured_lora_awq')
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,7 @@ class PipelineConfig:
     clip_grid: int = 4
 
     def validate(self):
-        if not self.treatments or len(set(self.treatments))!=len(self.treatments) or set(self.treatments)-set(TREATMENTS):
+        if not self.treatments or len(set(self.treatments))!=len(self.treatments) or set(self.treatments)-set(TREATMENTS+RECOVERY_TREATMENTS):
             raise ValueError('Unique supported treatments required')
         PruningConfig(sparsity=self.sparsity).validate()
         for name in ('group_size','seed','max_parameter_elements','max_model_bytes','scale_grid','clip_grid'):
@@ -73,7 +74,7 @@ def _identity(model):
     return digest.hexdigest()
 
 
-def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids,protocol,output_root,config=PipelineConfig(),predictor=None):
+def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids,protocol,output_root,config=PipelineConfig(),predictor=None,recovery_batches=None,recovery_ids=None):
     """Caller supplies small local assets; no loader, GPU flag, remote client or fallback."""
     config.validate(); admit_model(base_model)
     size=sum(t.numel()*t.element_size() for t in list(base_model.parameters())+list(base_model.buffers()))
@@ -106,6 +107,21 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
     heldout_tokens=[tokenizer(protocol['prompt_template'].format(question=r['question']),return_tensors='pt')['input_ids'].tolist() for r in records] if protocol['task']=='text' else []
     if any(t.tolist() in heldout_tokens for t in calibration_samples):
         raise ValueError('Calibration token content overlaps held-out evaluation')
+    recovery = bool(set(config.treatments) & set(RECOVERY_TREATMENTS))
+    recovery_identity = None
+    if recovery:
+        if protocol['task'] != 'text':
+            raise ValueError('Recovery suite currently supports text fixtures only')
+        if not isinstance(recovery_batches, (list, tuple)) or not recovery_batches or not isinstance(recovery_ids, (list, tuple)):
+            raise ValueError('Recovery treatments require explicit batches and provenance IDs')
+        if len(recovery_ids) != len(recovery_batches) or len(set(recovery_ids)) != len(recovery_ids) or set(recovery_ids) & (set(ids) | set(calibration_ids)):
+            raise ValueError('Recovery IDs must be unique and disjoint from calibration/evaluation')
+        from compression.recovery import prepare_recovery_batches
+        recovery_batches = prepare_recovery_batches(base_model, recovery_batches)
+        if any(row.tolist() == tokens[0] for batch in recovery_batches for row in batch['input_ids'] for tokens in heldout_tokens):
+            raise ValueError('Recovery token content overlaps held-out evaluation')
+        recovery_identity = {'ids': list(recovery_ids), 'batches_sha256': canonical_hash([
+            {key: value.tolist() for key, value in batch.items()} for batch in recovery_batches])}
     data=[]
     for record in records:
         item=copy.deepcopy(record)
@@ -114,6 +130,8 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
     fixed={'protocol':protocol,'held_out_fingerprint':canonical_hash(data), 'base_state_sha256':_identity(base_model),
            'calibration_ids':list(calibration_ids),'calibration_token_sha256':canonical_hash([t.tolist() for t in calibration_samples]),
            'evidence':'SYNTHETIC_OR_SMALL_CPU_ONLY','seed':config.seed}
+    if recovery:
+        fixed['recovery_inputs'] = recovery_identity
     suite=ExperimentStore(output_root).create('compression_suite',asdict(config)|fixed)
     suite.transition('RUNNING'); results=[]
     try:
@@ -129,9 +147,14 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
                 model=copy.deepcopy(base_model).eval(); pruning=None
                 from evaluation.integrity import guard_logits
                 guard_logits(model)
-                if treatment in {'unstructured','unstructured_awq','structured_mlp','structured_awq'}:
+                if treatment in {'unstructured','unstructured_awq','structured_mlp','structured_awq',*RECOVERY_TREATMENTS}:
                     method='mlp_neurons' if treatment.startswith('structured') else 'magnitude_mask'
                     pruning=prune(model,PruningConfig(method=method,sparsity=config.sparsity))
+                recovery_report = None
+                if treatment in RECOVERY_TREATMENTS:
+                    from compression.recovery import recover_lora, RecoveryConfig
+                    adapted, recovery_report = recover_lora(model, recovery_batches, RecoveryConfig(seed=config.seed))
+                    model = adapted.merge_and_unload(safe_merge=True).eval()
                 quant=None
                 if 'awq' in treatment:
                     materialize_masks(model)
@@ -150,6 +173,7 @@ def run_suite(base_model,tokenizer,calibration_samples,records,*,calibration_ids
                     outputs.append({'id':record['id'],'prediction':prediction['text'],'token_ids':prediction['token_ids'],
                                     'correct':normalize(prediction['text']) in {normalize(a) for a in record['answers']}})
                 metadata=fixed|{'treatment':treatment,'pruning':pruning,'quantization':quant,'architecture':architecture(model),
+                    'recovery': recovery_report,
                     'effective_generation':getattr(predictor,'effective_config',None),
                     'tokenizer_vocab_sha256':canonical_hash(tokenizer.get_vocab()) if hasattr(tokenizer,'get_vocab') else None}
                 if metadata['effective_generation'] is None:
