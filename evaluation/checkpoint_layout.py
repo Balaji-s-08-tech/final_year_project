@@ -103,6 +103,46 @@ def validate_siglip_checkpoint(root, model, coverage):
     return report
 
 
+def embedded_vision_subgraph(wrapper):
+    """Derive supported Bunny coverage from SigLIP hidden-state selection.
+
+    Transformers 4.37.2 returns embeddings at hidden_states[0], followed by one
+    state per encoder block. Bunny consumes that tuple, not last_hidden_state
+    (post-normalized) or pooler_output. Later blocks/head are computed by HF but
+    cannot affect the selected earlier state. Keep post_layernorm mandatory as a
+    conservative export contract, although it too is outside the feature path.
+    """
+    import transformers
+    from transformers import SiglipVisionModel
+    from transformers.models.siglip.modeling_siglip import SiglipVisionTransformer, SiglipEncoder, SiglipEncoderLayer
+    from bunny.model.multimodal_encoder.siglip.siglip_encoder import SiglipVisionTower, SiglipVisionTowerS2
+    if transformers.__version__ != '4.37.2' or type(wrapper) not in (SiglipVisionTower, SiglipVisionTowerS2):
+        raise ValueError('Unsupported Bunny/SigLIP feature-selection implementation')
+    if getattr(wrapper.feature_select, '__func__', None) is not SiglipVisionTower.feature_select:
+        raise ValueError('Unsupported vision feature selection')
+    model = wrapper.vision_tower
+    if type(model) is not SiglipVisionModel or type(model.vision_model) is not SiglipVisionTransformer or type(model.vision_model.encoder) is not SiglipEncoder:
+        raise ValueError('Unsupported SigLIP vision architecture')
+    layers = model.vision_model.encoder.layers
+    depth = model.config.num_hidden_layers
+    selection = wrapper.select_layer
+    if type(depth) is not int or depth < 1 or depth != len(layers) or any(type(layer) is not SiglipEncoderLayer for layer in layers):
+        raise ValueError('Incompatible SigLIP encoder depth/configuration')
+    if type(selection) is not int or not -(depth + 1) <= selection <= depth:
+        raise ValueError('Invalid SigLIP hidden-state selection')
+    selected_index = selection if selection >= 0 else depth + 1 + selection
+    state = model.state_dict()
+    optional_groups = []
+    for index in range(selected_index, depth):
+        prefix = f'vision_model.encoder.layers.{index}.'
+        optional_groups.append({key for key in state if key.startswith(prefix)})
+    optional_groups.append({key for key in state if key.startswith('vision_model.head.')})
+    if any(not group for group in optional_groups):
+        raise ValueError('Incomplete configured SigLIP downstream modules')
+    required = set(state) - set().union(*optional_groups)
+    return required, optional_groups, selected_index
+
+
 def validate_bunny_checkpoint(root, model, coverage, *, chunk_bytes=8*1024*1024):
     """Reconcile lazy tower extras with the actually loaded standalone vision model.
 
@@ -118,17 +158,24 @@ def validate_bunny_checkpoint(root, model, coverage, *, chunk_bytes=8*1024*1024)
         validate_loading_info(coverage, set(), 'Bunny')
         return {'status': 'STRICT_TRANSFORMERS_COVERAGE', 'redundant_vision_tensors': 0,
                 'redundancy_comparison': 'NO_SAFETENSORS_EXCEPTION_ALLOWED'}
-    tower = model.get_vision_tower().vision_tower
+    wrapper = model.get_vision_tower()
+    tower = wrapper.vision_tower
     vision = tower.state_dict()
     expected = {key: value for key, value in model.state_dict().items() if not key.startswith(EMBEDDED_VISION_PREFIX)}
     with TensorCheckpoint(root) as checkpoint:
         embedded = {key for key in checkpoint.tensors if key.startswith(EMBEDDED_VISION_PREFIX)}
         checkpoint.validate_shapes(expected, allowed_extra=embedded)
         if embedded:
-            required = {EMBEDDED_VISION_PREFIX + key for key in vision}
-            if embedded != required:
-                raise ValueError('Embedded Bunny vision checkpoint coverage differs from standalone SigLIP')
-            for key, target in vision.items():
+            required, optional_groups, selected_index = embedded_vision_subgraph(wrapper)
+            present = {key[len(EMBEDDED_VISION_PREFIX):] for key in embedded}
+            if not required <= present or not present <= set(vision):
+                raise ValueError('Embedded Bunny vision checkpoint coverage differs from required SigLIP feature subgraph')
+            if any(present & group and not group <= present for group in optional_groups):
+                raise ValueError('Partial optional downstream vision module in embedded checkpoint')
+            # Compare every embedded tensor, including optional modules if supplied;
+            # absent downstream tensors are never looked up in the source shard.
+            for key in sorted(present):
+                target = vision[key]
                 source_key = EMBEDDED_VISION_PREFIX + key
                 if checkpoint.shape(source_key) != tuple(target.shape):
                     raise ValueError(f'Embedded vision shape mismatch: {key}')
@@ -147,6 +194,9 @@ def validate_bunny_checkpoint(root, model, coverage, *, chunk_bytes=8*1024*1024)
     validate_loading_info(coverage, embedded, 'Bunny')
     report = {'status': 'VERIFIED_CONFIGURED_LAYOUT', 'redundant_vision_tensors': len(embedded),
               'redundancy_comparison': 'EXACT_AFTER_FP16_CONVERSION' if embedded else 'NOT_PRESENT'}
+    if embedded:
+        report.update(feature_hidden_state_index=selected_index, required_vision_tensors=len(required),
+                      standalone_only_tensors=len(set(vision) - present))
     if embedded:
         LOGGER.warning('Bunny loading warnings reconciled: %d redundant vision tensors verified against standalone SigLIP; language/projector coverage is exact', len(embedded))
     return report

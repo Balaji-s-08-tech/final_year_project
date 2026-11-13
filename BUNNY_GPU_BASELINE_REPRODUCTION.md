@@ -97,6 +97,12 @@ errors or mismatched vision values still fail. Do not mute all Transformers logs
 
 The metadata checks support single-file and indexed/sharded safetensors, following
 Transformers' single-file precedence. No fixed 421/440 acceptance counts exist.
+The embedded vision layout is derived from Bunny's hidden-state selector. For
+the pinned 27-block vision model, `-2` consumes the output of blocks 0..25;
+block 26 and the pooling head need not be embedded. Their standalone weights
+remain required by the full SigLIP loader. Post-layernorm remains mandatory in
+the embedded export. See [subgraph correction](docs/reports/BUNNY_VISION_SUBGRAPH_FIX.md)
+for the original 421/448 validation failure and the CPU regression evidence.
 The explicitly trusted legacy Bunny `.bin` route keeps strict loading coverage;
 it receives no redundant-key exception. Prefer the pinned safetensors route.
 
