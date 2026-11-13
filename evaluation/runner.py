@@ -124,7 +124,16 @@ def evaluate(config, output_root, *, adapter: Adapter | None = None, authorize_g
             add("original_parameter_count" if config.treatment == "baseline" else "remaining_parameter_count", layout["logical_parameter_elements"], "unique_registered_parameters_plus_logical_packed_weights")
             sizes = [report.get("model", {}).get("artifact_bytes"), (report.get("vision") or {}).get("artifact_bytes")]
             if config.treatment_artifact_path:
-                sizes.append((Path(config.treatment_artifact_path) / 'blocks.safetensors').stat().st_size)
+                root=Path(config.treatment_artifact_path)
+                if (getattr(active,'treatment_identity',None) or {}).get('format')=='bunny-mlp-recipe-v1':
+                    from compression.recipe import storage_bytes
+                    recipe_bytes=storage_bytes(root)
+                    sizes.append(recipe_bytes)
+                    write_json(run.path/'deployment_storage.json',{'recipe_bytes':recipe_bytes,
+                        'base_dependency_weight_bytes':sum(s for s in sizes[:-1] if s is not None),
+                        'runtime_parameter_bytes':layout.get('parameter_bytes'),
+                        'warning':'Recipe bytes are not deployed model size or memory residency'})
+                else:sizes.append((root/'blocks.safetensors').stat().st_size)
             if sizes[0] is not None:
                 add("original_model_size" if config.treatment == "baseline" else "compressed_model_size", sum(s for s in sizes if s is not None), "base_vision_and_treatment_dependency_bytes" if config.treatment_artifact_path else "model_and_vision_weight_files_stat")
             if config.device.startswith("cuda"):

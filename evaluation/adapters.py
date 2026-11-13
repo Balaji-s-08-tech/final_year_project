@@ -37,6 +37,22 @@ class LocalAdapter:
         prepare_deterministic_cuda(config.device)
         self.config = config
         self.asset_verification = {}
+        recipe_artifact = False
+        if config.treatment_artifact_path:
+            from experiments.store import read_json
+            recipe_artifact = read_json(Path(config.treatment_artifact_path)/'treatment.json').get('format') == 'bunny-mlp-recipe-v1'
+            if recipe_artifact:
+                from compression.recipe import load, reconstruction_ram, storage_bytes
+                if storage_bytes(config.treatment_artifact_path)>config.max_treatment_bytes:raise ValueError('Recipe exceeds configured artifact byte budget')
+                recipe, _ = load(config.treatment_artifact_path, config.model_path,verify_source=False)
+                identity=recipe['plan']['source_manifest']
+                if (identity['identifier'],identity['revision'])!=(config.model_identifier,config.model_revision):raise ValueError('Recipe source identity contradicts evaluation config')
+                # Explicit bounded-reconstruction profile, separate from the
+                # full-stage CPU preparation gate. Check before loading weights.
+                import psutil
+                required=reconstruction_ram(config)
+                if psutil.virtual_memory().available < required:raise ValueError('Insufficient RAM for source-bound reconstruction profile')
+                load(config.treatment_artifact_path,config.model_path)
         from VLM.quantization.awq_model_loader import _enable_project_imports
         _enable_project_imports()
         if config.adapter == "portable_awq_text":
@@ -76,7 +92,7 @@ class LocalAdapter:
             model_config.continuous_training = False
             self.tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, trust_remote_code=False)
             self.model, loading = BunnyPhiForCausalLM.from_pretrained(local, config=model_config, local_files_only=True,
-                torch_dtype=torch.float32 if config.treatment_artifact_path else getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True, use_safetensors=True if not config.trusted_checkpoint else None)
+                torch_dtype=torch.float32 if config.treatment_artifact_path and not recipe_artifact else getattr(torch, config.dtype), low_cpu_mem_usage=True, output_loading_info=True, use_safetensors=True if not config.trusted_checkpoint else None)
             tower = self.model.get_vision_tower()
             if tower is None:
                 raise ValueError("Checkpoint has no vision tower")
@@ -89,9 +105,17 @@ class LocalAdapter:
             self.processor = tower.image_processor
             self.treatment_identity = None
             if config.treatment_artifact_path:
-                from compression.multimodal import apply_treatment
-                self.treatment_identity = apply_treatment(self, config.treatment_artifact_path, max_bytes=config.max_treatment_bytes)
+                if recipe_artifact:
+                    from compression.recipe import apply
+                    self.treatment_identity = apply(self, config.treatment_artifact_path)
+                else:
+                    from compression.multimodal import apply_treatment
+                    self.treatment_identity = apply_treatment(self, config.treatment_artifact_path, max_bytes=config.max_treatment_bytes)
             self.model.to(device=config.device, dtype=getattr(torch, config.dtype))
+            if recipe_artifact:
+                self.treatment_identity['deployed_parameter_bytes']=sum(p.numel()*p.element_size() for p in self.model.parameters())
+                self.treatment_identity['deployed_buffer_bytes']=sum(t.numel()*t.element_size() for t in self.model.buffers())
+                self.treatment_identity['runtime_dtypes']=sorted({str(p.dtype) for p in self.model.parameters()})
         from evaluation.integrity import validate_state, guard_logits
         validate_state(self.model)
         guard_logits(self.model)

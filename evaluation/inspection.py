@@ -46,6 +46,14 @@ def compatibility(config):
     errors, warnings = [], []
     if config.adapter == "bunny_phi" and config.treatment != "baseline" and not config.treatment_artifact_path:
         errors.append("Dense Bunny adapter currently validates original baseline only; compressed/recovered lineage needs a separate bridge")
+    if config.treatment_artifact_path:
+        try:
+            declaration=read_json(Path(config.treatment_artifact_path)/'treatment.json')
+            if declaration.get('format')=='bunny-mlp-recipe-v1':
+                from compression.recipe import load
+                load(config.treatment_artifact_path,config.model_path,verify_source=False)
+                if config.treatment!='structured_pruning':raise ValueError('Recipe requires structured_pruning treatment')
+        except (OSError,ValueError,KeyError,TypeError) as exc:errors.append(f'Recipe/artifact preflight: {exc}')
     if config.adapter == "portable_awq_text":
         path = Path(config.model_path)
         errors.extend([] if path.is_file() else ["Portable checkpoint is unavailable"])

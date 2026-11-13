@@ -17,6 +17,16 @@ def preflight(config, project_root=None, environment=None):
     if environment is None:
         _, environment = capture(project_root or Path.cwd())
     ram = environment.get("ram", {}).get("available_bytes")
+    if config.treatment_artifact_path:
+        try:
+            from experiments.store import read_json
+            declaration=read_json(Path(config.treatment_artifact_path)/'treatment.json')
+            if declaration.get('format')=='bunny-mlp-recipe-v1':
+                from compression.recipe import reconstruction_ram
+                required=reconstruction_ram(config)
+                report['recipe_reconstruction_required_ram_bytes']=required
+                if ram is None or ram<required:report['errors'].append('Insufficient/unknown RAM for source-bound reconstruction profile')
+        except (OSError,ValueError,TypeError,AttributeError) as exc:report['errors'].append(f'Recipe admission: {exc}')
     gpu = (environment.get("gpu_devices") or [None])[0]
     mcfg = report.get("model", {}).get("config") or {}
     vcfg = (report.get("vision") or {}).get("config") or {}
