@@ -85,10 +85,19 @@ def materialize_masks(model):
 
 
 def _slice(source, rows, columns):
-    result = nn.Linear(len(columns), len(rows), bias=source.bias is not None, dtype=source.weight.dtype, device=source.weight.device)
-    result.weight = nn.Parameter(source.weight.detach()[rows][:, columns].clone(), requires_grad=source.weight.requires_grad)
+    # The random initialization is immediately replaced, so allocate only metadata.
+    result = nn.Linear(len(columns), len(rows), bias=source.bias is not None, dtype=source.weight.dtype, device='meta')
+    full_rows = len(rows) == source.out_features and torch.equal(rows, torch.arange(source.out_features, device=rows.device))
+    full_columns = len(columns) == source.in_features and torch.equal(columns, torch.arange(source.in_features, device=columns.device))
+    if full_columns:
+        weight = source.weight.detach().index_select(0, rows)
+    elif full_rows:
+        weight = source.weight.detach().index_select(1, columns)
+    else:
+        weight = source.weight.detach().index_select(0, rows).index_select(1, columns)
+    result.weight = nn.Parameter(weight, requires_grad=source.weight.requires_grad)
     if source.bias is not None:
-        result.bias = nn.Parameter(source.bias.detach()[rows].clone(), requires_grad=source.bias.requires_grad)
+        result.bias = nn.Parameter(source.bias.detach().index_select(0, rows), requires_grad=source.bias.requires_grad)
     result.train(source.training)
     return result
 
@@ -119,13 +128,16 @@ def prune(model, config=PruningConfig()):
                             'masked_fraction':float((~mask).float().mean()),
                             'actual_zero_fraction':float(((source.weight.detach()*mask)==0).float().mean())})
     else:
+        # Prevalidation is complete. Keeping this map would retain every original
+        # MLP after replacement, accumulating a whole extra model's MLP storage.
+        del selected
         for index, block in enumerate(model.model.layers):
             a, b = block.mlp.fc1, block.mlp.fc2
             remove = int(a.out_features * config.sparsity)
             score = a.weight.detach().to(torch.float64).abs().mean(1) + b.weight.detach().to(torch.float64).abs().mean(0)
             keep = torch.argsort(score, stable=True)[remove:].sort().values
-            block.mlp.fc1 = _slice(a, keep, torch.arange(a.in_features))
-            block.mlp.fc2 = _slice(b, torch.arange(b.out_features), keep)
+            block.mlp.fc1 = _slice(a, keep, torch.arange(a.in_features, device=a.weight.device))
+            block.mlp.fc2 = _slice(b, torch.arange(b.out_features, device=b.weight.device), keep)
             details.append({'layer':index, 'original_intermediate':a.out_features, 'remaining_intermediate':len(keep), 'kept_neurons':keep.tolist()})
     widths=[block.mlp.fc1.out_features for block in model.model.layers]
     if hasattr(model.config,'intermediate_size') and len(set(widths))==1:
